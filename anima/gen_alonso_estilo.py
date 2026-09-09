@@ -1,0 +1,273 @@
+# ÁNIMA — Alonso: estilización (paso 2 de 3)
+#
+# Herramienta de EDITOR. Toma la base humana de MPFB2 y la lleva al estilo del
+# juego: JRPG estilizado, chico de 15-16, ojos grandes y expresivos.
+#   Flipendo --background --python gen_alonso_estilo.py
+# Entrada: AlonsoBase.blend   Salida: AlonsoEstilo.blend
+#
+# Se trabaja SOBRE una base esculpida en vez de generar geometría: los rasgos
+# (nariz, labios, párpados, orejas) ya están, y la topología va en anillos
+# alrededor de ojos y boca — que es lo que luego permite parpadeo y sonrisa.
+# Aquí solo se deforma.
+#
+# EL ORDEN IMPORTA, y costó dos vueltas averiguarlo:
+#   1. fijar la mezcla de fenotipo    (las props MPFB_HUM_* NO la aplican solas)
+#   2. hornear los shape keys         (mientras existan, tocar co no hace nada)
+#   3. medir referencias              (sobre la geometría YA horneada, o van desfasadas)
+#   4. podar geometría auxiliar
+#   5. deformar
+#   6. normalizar estatura
+
+import bpy
+import bmesh
+import collections
+import math
+import os
+import sys
+from mathutils import Vector
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.modules.pop("anima_kit", None)
+from anima_kit import clamp01, lerp, smoothstep                    # noqa: E402
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+IN_BLEND = os.path.join(HERE, "AlonsoBase.blend")
+OUT_BLEND = os.path.join(HERE, "AlonsoEstilo.blend")
+
+# --- cuánto se estiliza -------------------------------------------------------
+HEAD_SCALE = 1.130      # cabeza algo mayor: lectura juvenil, no chibi
+EYE_WIDE = 1.48         # el ojo se ensancha...
+EYE_TALL = 2.15         # ...y sobre todo SE ABRE: eso es lo que lo hace JRPG
+NOSE_SHRINK = 0.44      # nariz pequeña, casi insinuada
+MOUTH_SHRINK = 0.84
+HAND_GROW = 1.10        # manos y pies algo exagerados ayudan a la silueta
+HEIGHT_TARGET = 1.680
+
+# fenotipo de partida: joven caucásico masculino
+# ($md = macrodetail, $ca = caucásico, $ma = masculino, $yn = joven)
+MIX = {"$md-$ca-$ma-$yn": 1.0,
+       "$md-universal-$ma-$yn-$av$mu-$av$wg": 1.0}
+
+bpy.ops.wm.open_mainfile(filepath=IN_BLEND)
+h = bpy.data.objects["Alonso_Base"]
+me = h.data
+
+# --- 1 y 2: fenotipo y horneado ----------------------------------------------
+if me.shape_keys:
+    kb = me.shape_keys.key_blocks
+    for k in kb:
+        if k.name != "Basis":
+            k.value = MIX.get(k.name, 0.0)
+    # No se evalúa con el depsgraph: MPFB deja un modificador Mask que oculta los
+    # helpers, así que la malla evaluada tiene menos vértices y los índices no
+    # casan. La mezcla relativa se calcula a mano, que además es exacta.
+    basis = kb[0]
+    baked = []
+    for vi in range(len(me.vertices)):
+        co = basis.data[vi].co.copy()
+        for k in kb[1:]:
+            if k.value:
+                ref = k.relative_key or basis
+                co += (k.data[vi].co - ref.data[vi].co) * k.value
+        baked.append(co)
+    h.shape_key_clear()
+    for i, v in enumerate(me.vertices):
+        v.co = baked[i]
+    me.update()
+    print(f"[EST] fenotipo horneado en {len(baked)} verts")
+
+for mod in list(h.modifiers):
+    print("[EST] modificador retirado:", mod.name, mod.type)
+    h.modifiers.remove(mod)
+
+
+# --- 3: referencias, medidas sobre la geometría ya horneada -------------------
+def group_centroid(name):
+    g = h.vertex_groups.get(name)
+    if g is None:
+        return None
+    pts = [v.co for v in me.vertices
+           if any(gr.group == g.index and gr.weight > 0.35 for gr in v.groups)]
+    return (sum(pts, Vector()) / len(pts)) if pts else None
+
+
+L_EYE = group_centroid("helper-l-eye") or group_centroid("joint-l-eye")
+R_EYE = group_centroid("helper-r-eye") or group_centroid("joint-r-eye")
+NECKJ = group_centroid("joint-neck")
+JAWJ = group_centroid("joint-jaw")
+MOUTHJ = group_centroid("joint-mouth")
+assert L_EYE and R_EYE and NECKJ and JAWJ, "faltan referencias en la malla base"
+
+CROWN_Z = max(v.co.z for v in me.vertices)
+EYE_Z0 = L_EYE.z
+# punta de la nariz: el vértice más adelantado entre boca y ojos, en el eje
+cand = [v.co for v in me.vertices
+        if abs(v.co.x) < 0.018 and JAWJ.z + 0.030 < v.co.z < EYE_Z0]
+# .copy() obligatorio: v.co es un proxy RNA, y al podar vértices la referencia
+# queda colgando y Blender casca al leerla.
+NOSE_TIP = (min(cand, key=lambda c: c.y).copy() if cand
+            else Vector((0, -0.13, EYE_Z0 - 0.04)))
+# labios: el vértice más adelantado por debajo de la nariz
+cand = [v.co for v in me.vertices
+        if abs(v.co.x) < 0.012 and JAWJ.z + 0.010 < v.co.z < NOSE_TIP.z - 0.012]
+LIP = (min(cand, key=lambda c: c.y).copy() if cand
+       else Vector((0, -0.10, NOSE_TIP.z - 0.030)))
+CHIN_Z = JAWJ.z
+print(f"[EST] ojos z {EYE_Z0:.4f} sep {(L_EYE - R_EYE).length:.4f} | nariz "
+      f"{tuple(round(c, 3) for c in NOSE_TIP)} | labio {tuple(round(c, 3) for c in LIP)}"
+      f" | barbilla {CHIN_Z:.3f} | coronilla {CROWN_Z:.3f}")
+
+# --- 4: podar geometría auxiliar ---------------------------------------------
+aux_idx = {g.index for g in h.vertex_groups
+           if g.name in ("HelperGeometry", "JointCubes")
+           or g.name.startswith(("helper-", "joint-"))}
+bg = h.vertex_groups.get("body")
+body_idx = bg.index if bg else None
+kill = [v.index for v in me.vertices
+        if ({gr.group for gr in v.groups} & aux_idx)
+        and (body_idx is None or body_idx not in {gr.group for gr in v.groups})]
+if kill:
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    bmesh.ops.delete(bm, geom=[bm.verts[i] for i in kill], context='VERTS')
+    bm.to_mesh(me)
+    bm.free()
+print(f"[EST] auxiliares borrados: {len(kill)} -> {len(me.vertices)} verts")
+
+# --- 5: deformación de estilo ------------------------------------------------
+orig = [v.co.copy() for v in me.vertices]
+delta = [Vector((0, 0, 0)) for _ in orig]
+WRIST_L = group_centroid("joint-l-wrist")
+WRIST_R = group_centroid("joint-r-wrist")
+
+
+def ellip(d, rx, ry, rz):
+    return Vector((d.x / rx, d.y / ry, d.z / rz)).length
+
+
+def style_delta(p):
+    delta_i = Vector((0, 0, 0))
+    # cabeza algo mayor, escalada desde la base del cuello
+    w = smoothstep(NECKJ.z - 0.055, CHIN_Z + 0.010, p.z)
+    if w > 0.0:
+        # en Z se escala menos: escalar uniforme desde el cuello alarga la cabeza
+        # y sale un huevo en vez de una cabeza juvenil (ancha, no larga)
+        d = p - NECKJ
+        delta_i += Vector((d.x, d.y, d.z * 0.55)) * ((HEAD_SCALE - 1.0) * w)
+
+    # OJOS. Campo ceñido al ojo, y crece mucho más en vertical que en horizontal:
+    # un ojo JRPG no es un ojo realista escalado, es un ojo ABIERTO, que se come
+    # parte de pómulo y de ceja.
+    for EC in (L_EYE, R_EYE):
+        d = p - EC
+        # Caída ANCHA a propósito: si el campo es estrecho, el borde se desplaza
+        # mucho y el vecino nada, y sale un reborde tipo antifaz alrededor del ojo.
+        w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.058, 0.068, 0.044)))
+        if w > 0.002:
+            inward = clamp01(-d.x / 0.026) if EC.x > 0 else clamp01(d.x / 0.026)
+            delta_i += Vector((d.x * (EYE_WIDE - 1.0) * w * (1.0 - 0.50 * inward),
+                                0.0, d.z * (EYE_TALL - 1.0) * w))
+            delta_i.z -= 0.0060 * w                          # ojo algo más bajo
+            delta_i.x += (0.0040 * w) * (1 if EC.x > 0 else -1)
+
+        # ceja y pómulo más blandos: el relieve adulto envejece la cara
+        d2 = p - Vector((EC.x, EC.y, EC.z + 0.028))
+        delta_i.y += 0.0065 * smoothstep(1.0, 0.0, clamp01(ellip(d2, 0.050, 0.046, 0.021)))
+        d2 = p - Vector((EC.x * 1.35, EC.y + 0.012, EC.z - 0.038))
+        delta_i.y += 0.0045 * smoothstep(1.0, 0.0, clamp01(ellip(d2, 0.042, 0.046, 0.032)))
+
+    # nariz pequeña, encogida hacia su raíz
+    root = Vector((0.0, NOSE_TIP.y + 0.026, NOSE_TIP.z + 0.026))
+    d = p - root
+    w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.030, 0.042, 0.040)))
+    if w > 0.002:
+        delta_i += d * ((NOSE_SHRINK - 1.0) * w)
+
+    # boca menor
+    d = p - LIP
+    w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.040, 0.038, 0.026)))
+    if w > 0.002:
+        delta_i += d * ((MOUTH_SHRINK - 1.0) * w)
+
+    # mandíbula estrecha y barbilla corta: la cara adulta es larga por abajo
+    d = p - Vector((0.0, JAWJ.y - 0.005, CHIN_Z + 0.014))
+    w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.082, 0.082, 0.052)))
+    if w > 0.002:
+        delta_i.x -= p.x * 0.165 * w
+        delta_i.z += 0.020 * w
+        delta_i.y += 0.005 * w
+
+    # cráneo más lleno arriba y frente algo mayor
+    d = p - Vector((0.0, -0.015, CROWN_Z - 0.055))
+    w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.100, 0.110, 0.080)))
+    if w > 0.002:
+        delta_i += Vector((p.x, p.y + 0.015, 0.0)) * (0.016 * w)
+
+    # manos algo mayores
+    for WJ in (WRIST_L, WRIST_R):
+        if WJ is None:
+            continue
+        d = p - WJ
+        if d.length < 0.17:
+            delta_i += d * ((HAND_GROW - 1.0)
+                             * smoothstep(0.0, 1.0, clamp01((d.length - 0.005) / 0.080)))
+    return delta_i
+
+
+for i, p in enumerate(orig):
+    delta[i] = style_delta(p)
+
+for i, v in enumerate(me.vertices):
+    v.co = orig[i] + delta[i]
+me.update()
+
+# Pase de relajación sobre lo que se ha movido: quita los pliegues que deja el
+# desplazamiento por campos. Los bordes de los huecos (ojos, boca) se dejan
+# fijos, o el suavizado cerraría la apertura que acabamos de abrir.
+moved = [i for i, d in enumerate(delta) if d.length > 0.0012]
+if moved:
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    frozen = {v.index for v in bm.verts if v.is_boundary}
+    target = [bm.verts[i] for i in moved if i not in frozen]
+    for _ in range(3):
+        bmesh.ops.smooth_vert(bm, verts=target, factor=0.55,
+                              use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    print(f"[EST] relajados {len(target)} verts ({len(frozen)} de borde intactos)")
+
+# --- 6: estatura final y referencias para el resto del pipeline --------------
+zs = [v.co.z for v in me.vertices]
+zmin, zmax = min(zs), max(zs)
+k = HEIGHT_TARGET / (zmax - zmin)
+for v in me.vertices:
+    v.co = Vector((v.co.x * k, v.co.y * k, (v.co.z - zmin) * k))
+me.update()
+
+# Las referencias de ojo se pasan por la MISMA deformación y la misma
+# normalización que la malla: así el paso 3 sabe exactamente dónde acabaron.
+def to_final(pt):
+    q = pt + style_delta(pt)
+    return Vector((q.x * k, q.y * k, (q.z - zmin) * k))
+
+
+LE, RE = to_final(L_EYE), to_final(R_EYE)
+h["ALONSO_L_EYE"] = tuple(LE)
+h["ALONSO_R_EYE"] = tuple(RE)
+h["ALONSO_EYE_SEP"] = (LE - RE).length
+EYE_Z = (LE.z + RE.z) * 0.5
+print(f"[EST] ojos finales: L {tuple(round(c,4) for c in LE)} sep {(LE-RE).length:.4f}")
+h["ALONSO_EYE_Z"] = EYE_Z
+h["ALONSO_CROWN_Z"] = max(v.co.z for v in me.vertices)
+h["ALONSO_HEIGHT"] = HEIGHT_TARGET
+h.name = "Alonso"
+h.data.name = "Alonso_Malla"
+print(f"[EST] estatura {HEIGHT_TARGET:.3f} m | ojos z {EYE_Z:.4f} | "
+      f"{HEIGHT_TARGET / (h['ALONSO_CROWN_Z'] - (CHIN_Z * k)):.2f} cabezas aprox")
+bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
+print("[EST] guardado:", OUT_BLEND)
+print("[EST] OK")

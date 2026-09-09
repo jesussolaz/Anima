@@ -30,7 +30,7 @@ La evolución de cada pieza, con imágenes, está en la **[bitácora](bitacora/)
 | Terreno 1 — La Mancha | mapa jugable: pueblo, camino, arroyo, molinos |
 | El Molino | pieza héroe: 661 tejas colocadas una a una, aspas de celosía |
 | Interior del Molino | la casa del panadero: horno de bóveda de 213 ladrillos |
-| Alonso Quijano | **en curso** — [base procedural descartada](bitacora/04-alonso.md) |
+| Alonso Quijano | **en curso** — [base cambiada dos veces](bitacora/04-alonso.md) |
 
 ## Cómo está construido
 

@@ -1,70 +1,104 @@
 # 04 — Alonso Quijano
 
-El protagonista. 15-16 años, 1,68 m. Estilizado tipo JRPG, con la expresividad
-y las proporciones de aventura que buscamos.
+El protagonista. 15-16 años, 1,68 m, estilizado tipo JRPG.
 
-**En curso.** Esta entrada documenta un cambio de método a mitad de camino.
+**En curso.** Esta entrada documenta dos cambios de método y lo que falta.
 
-## Intento 1 — generar la cara por código (descartado)
+---
 
-Mismo enfoque que funcionó con el molino: construir por código, con perfiles y
-campos de desplazamiento. Cráneo lofteado desde perfiles reales (frontal,
-lateral, nuca), esculpido con campos para cuencas, pómulos, arco superciliar,
-mandíbula y mentón. Ojos grandes con iris en cúpula y pestaña en creciente.
-Pelo por mechones barridos. Materiales PBR con subsurface en la piel y
-anisotropía en el pelo.
+## v1 — generar la cara por código (descartado)
 
-![Alonso procedural, estado final](img/alonso-proc-retrato.jpg)
-![Tres cuartos](img/alonso-proc-tres-cuartos.jpg)
+Mismo enfoque que funcionó con el molino: perfiles y campos de desplazamiento.
 
-Se conserva en `anima/gen_alonso.py` como referencia del intento.
+![Alonso procedural](img/alonso-proc-retrato.jpg)
 
-### Por qué se descartó
+Se conserva en `anima/gen_alonso_procedural_descartado.py`.
 
-Mirando el resultado con ojos críticos: la cara es larga y plana, la nariz y los
-labios son bultos, el pelo son cuñas gruesas. Está a la altura de un personaje
-de relleno, no de un protagonista que aguante un primer plano.
+**Por qué se descartó.** La cara es larga y plana, la nariz y los labios son
+bultos, el pelo son cuñas. No es falta de detalle: **el método no da para esto**.
+La geometría regulada (tejas, dovelas, hiladas) sale muy bien generada por
+código porque obedece reglas. Una cara atractiva no: depende de topología en
+anillos alrededor de ojos y boca —lo que permite parpadeo y sonrisa creíbles— y
+de decisiones escultóricas que no se parametrizan.
 
-Y no es falta de detalle: **es que el método no da para esto**. Un molino sale
-bien generado por código porque es geometría regulada — hiladas, dovelas, tejas,
-cosas que obedecen reglas. Una cara atractiva no obedece reglas: depende de
-topología dispuesta en anillos que siguen ojos y boca (lo que permite un
-parpadeo y una sonrisa creíbles) y de miles de decisiones escultóricas de
-milímetro que no se parametrizan.
+**El bug que costó dos intentos.** `face_pt`, la función que devuelve la
+superficie de la cara, usaba una parametrización **distinta** a la de la malla
+(`|x|/w` en vez del ángulo del loft). Devolvía la superficie casi 2 cm por
+detrás de donde estaba, así que ojos, pestañas y cejas se enterraban dentro de
+la cabeza. Los ojos desaparecieron dos veces antes de dar con ello.
 
-### El bug que costó dos intentos
+---
 
-`face_pt`, la función que devuelve la superficie de la cara en un punto, usaba
-una parametrización **distinta** a la de la malla: `|x|/w` en vez del ángulo del
-loft. Devolvía la superficie casi 2 cm por detrás de donde estaba de verdad, así
-que todo lo que se apoyaba en ella —ojos, pestañas, cejas— se enterraba dentro
-de la cabeza. Los ojos desaparecieron dos veces antes de encontrarlo.
+## v2 — base esculpida + estilización (actual)
 
-## Intento 2 — base humana esculpida (en curso)
+Se parte de una malla humana ya resuelta, generada con **MPFB2**, y se deforma.
 
-Se cambió a partir de una malla base ya resuelta, generada con **MPFB2**.
+| Antes: base MPFB2 | Después: estilizado |
+|---|---|
+| ![base](img/alonso-base-cara.jpg) | ![estilizado](img/alonso-v2-cara.jpg) |
 
-![La base: cara](img/alonso-base-cara.jpg)
-![La base: cuerpo](img/alonso-base-cuerpo.jpg)
+![Cuerpo](img/alonso-v2-cuerpo.jpg)
 
-19.158 vértices, 1,66 m, ajustada a chico de ~16 años. Nariz, labios, párpados,
-orejas y cuencas ya esculpidos, y sobre todo **topología en anillos** alrededor
-de ojos y boca.
+**Qué hace el pase de estilización** (`anima/gen_alonso_estilo.py`): fija el
+fenotipo a joven caucásico masculino, agranda la cabeza un 13 % (más ancha que
+larga), **abre los ojos 2,15×** en vertical, encoge la nariz a menos de la
+mitad, estrecha la mandíbula, redondea la barbilla, suaviza ceja y pómulo,
+agranda algo las manos y normaliza la estatura a 1,68 m.
 
-Generador: `anima/gen_alonso_base.py`
+13.380 vértices tras podar la geometría auxiliar de MPFB.
+
+### El orden importa, y costó tres vueltas averiguarlo
+
+1. **Fijar el fenotipo primero.** Las propiedades `MPFB_HUM_*` por sí solas no
+   reconstruyen la malla — no disparan el callback de MPFB. Estuve trabajando
+   sobre el neutro andrógino sin saberlo. Se fija a mano la mezcla de shape keys.
+2. **Hornear los shape keys antes de tocar vértices.** Mientras existan, escribir
+   en `vertices[].co` **no cambia nada**: manda la mezcla de claves. Dos pases
+   enteros no surtieron efecto por esto.
+3. **Medir las referencias después de hornear**, no antes: el morph mueve la cara
+   y las referencias quedan desfasadas (la nariz encogía donde ya no estaba).
+4. **`.copy()` en las referencias.** `v.co` es un proxy RNA; al podar vértices la
+   referencia queda colgando y Blender casca.
+
+También: MPFB deja un modificador *Mask* que oculta los helpers, así que la malla
+evaluada tiene menos vértices que la base y los índices no casan — la mezcla se
+calcula a mano. Y tras deformar por campos hay que **relajar** la zona tocada, o
+queda un reborde tipo antifaz alrededor de los ojos.
 
 ### Sobre la licencia
 
-MPFB2 es **GPLv3**, y lo que genera es **CC0**: uso comercial permitido, incluso
-en juego cerrado. Esto importa y se deja escrito: en ÁNIMA **no entra material
-protegido de terceros ni modelos extraídos de otros juegos**. Kingdom Hearts es
-referencia de sensación y alcance, nunca de contenido.
+MPFB2 es **GPLv3** y lo que genera es **CC0**: uso comercial permitido, incluso
+en juego cerrado. En ÁNIMA **no entra material protegido de terceros ni modelos
+extraídos de otros juegos**. Kingdom Hearts es referencia de sensación, nunca de
+contenido.
+
+---
+
+## Lo que NO funciona todavía: los rasgos
+
+El paso 3 (`anima/gen_alonso.py`, con `RASGOS = True`) monta ojos y pelo. **Sale
+mal** y se deja documentado en vez de esconderlo:
+
+![Rasgos rotos](img/alonso-rasgos-roto.jpg)
+
+El casquete de pelo baja por la cara en lengüetas dentadas y los parches de ojo
+salen fragmentados. Los dos fallos tienen **la misma causa**: el ajuste se hace
+lanzando rayos desde un único punto dentro de la cabeza, y **una cabeza no es
+convexa**. A elevaciones bajas el rayo choca con el pómulo o la nariz en vez de
+con el cráneo, y el resultado es irregular.
+
+La corrección no es tocar parámetros, es cambiar el método de ajuste: proyectar
+sobre la malla con *shrinkwrap* (que resuelve el punto más cercano, no el primer
+impacto de un rayo), o construir el casquete a partir de una región del mapa UV
+del cuero cabelludo en vez de por rayos radiales.
+
+Con `RASGOS = False` (por defecto) el paso 3 solo aplica materiales PBR y deja el
+cuerpo estilizado limpio, que es lo que hay ahora en `Alonso.blend`.
 
 ## Siguiente
 
-1. Pase de estilización: cabeza algo mayor, ojos grandes de JRPG, rasgos suavizados.
+1. Rehacer el ajuste de ojos y pelo por proyección, no por rayos.
 2. Ropa con riqueza visual y movimiento.
-3. Rig completo con huesos faciales y secundarios (pañuelo, ropa).
+3. Rig con huesos faciales y secundarios (pañuelo, ropa).
 4. Expresiones para cinemáticas.
-5. Materiales PBR diferenciando tela, cuero, metal y piel.
-6. LODs.
+5. LODs.
