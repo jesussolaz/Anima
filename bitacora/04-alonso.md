@@ -74,7 +74,58 @@ contenido.
 
 ---
 
-## Lo que NO funciona todavía: los rasgos
+## v3 — buscar cómo se hace en vez de inventarlo
+
+El paso 3 (ojos y pelo) no salía. En vez de seguir tocando parámetros, se buscó
+cómo lo resuelve la gente en Blender. Dos cosas cambiaron el resultado:
+
+### 1. El pelo se ajusta con Shrinkwrap, no con raycast
+
+| Antes: ajuste por rayos | Después: Shrinkwrap |
+|---|---|
+| ![raycast](img/alonso-pelo-raycast.jpg) | ![shrinkwrap](img/alonso-v3-cara.jpg) |
+
+Yo lanzaba rayos desde un punto dentro de la cabeza para encontrar el cráneo.
+Falla porque **una cabeza no es convexa**: a poca altura el rayo choca con el
+pómulo o la nariz, y el casquete salía en lengüetas dentadas.
+
+El **modificador Shrinkwrap** en modo *Nearest Surface Point* resuelve el punto
+**más cercano** de la superficie, no el primer impacto de un rayo. Es además la
+técnica estándar documentada para casquetes de pelo. El casquete quedó limpio a
+la primera. Las raíces de los mechones nacen del casquete ya ajustado.
+
+### 2. Los ojos salen de un pack CC0 ajustado a esta misma base
+
+MakeHuman publica un pack de assets de sistema con globos oculares **ajustados a
+la malla base de MPFB2** — la misma que usa Alonso. No hay que adivinar el
+encaje: ya encaja.
+
+Los globos se **trasladan y escalan uniformemente**, no se pasan por el campo de
+deformación: ese campo es anisótropo a propósito (abre el párpado 2,15× en
+vertical) y estiraba el globo con su iris, dejando el ojo negro.
+
+Vienen con UV y texturas de iris. Todo CC0, declarado en la cabecera de los
+propios `.obj`: *"This asset was explicitly released as CC0 in september 2020"*.
+Guardado en `anima/assets/` con su `LICENCIA.md`.
+
+![Cuerpo](img/alonso-v3-cuerpo.jpg)
+
+---
+
+## Lo que sigue sin estar
+
+- **La mirada no lee.** El iris llena toda la apertura del párpado y el ojo queda
+  como una almendra oscura. Falta que asome esclerótica y falta pestaña, que es
+  lo que da expresión. Las búsquedas apuntan a que los ojos anime se modelan
+  **planos**, no esféricos — probablemente haya que sustituir el globo por
+  geometría plana con iris, pupila y brillo como piezas separadas.
+- **Los mechones siguen siendo conos gruesos.** El casquete está bien; los
+  mechones que salen de él, no. La vía documentada es curvas con *bevel* y perfil
+  de *taper*, o tiras de malla, no barridos cónicos.
+- Piel demasiado pálida, sin variación de tono.
+- Sin ropa, sin rig, sin expresiones, sin LODs.
+
+## Anexo — el intento fallido de v2 (referencia)
 
 El paso 3 (`anima/gen_alonso.py`, con `RASGOS = True`) monta ojos y pelo. **Sale
 mal** y se deja documentado en vez de esconderlo:

@@ -28,9 +28,9 @@ IN_BLEND = os.path.join(HERE, "AlonsoEstilo.blend")
 OUT_BLEND = os.path.join(HERE, "Alonso.blend")
 
 # EN CURSO. Los rasgos (ojos y pelo) todavía no salen bien: ver más abajo y
-# bitacora/04-alonso.md. Con RASGOS = False, este paso solo aplica materiales y
+# bitacora/04-alonso.md. Con RASGOS = False   # ojos y cejas propios: aún en curso, este paso solo aplica materiales y
 # deja un asset limpio; con True, monta la versión rota que sirve de diagnóstico.
-RASGOS = False
+RASGOS = False   # ojos y cejas propios: aún en curso
 
 bpy.ops.wm.open_mainfile(filepath=IN_BLEND)
 ob = bpy.data.objects["Alonso"]
@@ -96,6 +96,25 @@ IRIS = pbr("M_Iris", (0.115, 0.245, 0.185), rough=0.07, coat=0.9)
 PESTANA = pbr("M_Pestana", (0.040, 0.025, 0.022), rough=0.32)
 CEJA = pbr("M_Ceja", (0.105, 0.058, 0.038), rough=0.40)
 BRILLO = pbr("M_Brillo", (1, 1, 1), rough=0.05, emit=(1, 1, 1), emit_str=6.0)
+
+# Ojo con la textura del pack CC0: el iris viene pintado y mapeado a estas UV.
+OJO_MAT = pbr("M_Ojo", (1, 1, 1), rough=0.09, coat=0.9,
+              emit=(1, 1, 1), emit_str=0.28)   # el ojo va al fondo
+                                                # de la cuenca y se apaga
+_tex = os.path.join(HERE, "assets", "eyes", "materials", "bluegreen_eye.png")
+if os.path.exists(_tex):
+    nt = OJO_MAT.node_tree
+    img = nt.nodes.new("ShaderNodeTexImage")
+    img.image = bpy.data.images.load(_tex, check_existing=True)
+    img.interpolation = 'Cubic'
+    bsdf = nt.nodes["Principled BSDF"]
+    nt.links.new(img.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(img.outputs["Color"], bsdf.inputs["Emission Color"])
+    print("[AL] textura de iris:", os.path.basename(_tex))
+_ojos = bpy.data.objects.get("Alonso_Ojos")
+if _ojos:
+    _ojos.data.materials.clear()
+    _ojos.data.materials.append(OJO_MAT)
 me.materials.clear()
 me.materials.append(PIEL)
 
@@ -252,27 +271,14 @@ if RASGOS:
     print(f"[AL] ojos: {len(OJOS.data.polygons)} caras")
 
 # ----------------------------------------------------------------- PELO
-# Cada mechón nace en el cráneo REAL (rayo desde el centro de la cabeza) y luego
-# sigue un FLUJO. Si siguiera la normal, saldría un erizo.
-HAIR = Build()
-
-
-def skull_dir(a, elev, off=0.0):
-    d = Vector((math.sin(a) * math.cos(elev), -math.cos(a) * math.cos(elev),
-                math.sin(elev)))
-    loc, nor = skull_at(d)
-    if loc is None:
-        return None, None
-    n = (loc - HEAD_C)
-    n.z *= 0.72
-    n.normalize()
-    return loc + n * off, n
-
-
-#            |a|     elevación mínima donde empieza el pelo (radianes)
-HAIRLINE = [(0.00, math.radians(58)), (0.60, math.radians(52)),
-            (1.05, math.radians(40)), (1.45, math.radians(22)),
-            (2.10, math.radians(2)), (3.15, math.radians(-12))]
+# Ajuste por SHRINKWRAP, no por raycast. Un rayo desde el centro de la cabeza
+# choca con el pómulo o la nariz a poca altura, porque una cabeza NO es convexa,
+# y el casquete salía en lengüetas dentadas. Shrinkwrap resuelve el punto más
+# cercano de la superficie, que es lo que hace falta. Es además la técnica
+# estándar para casquetes de pelo en Blender.
+HAIRLINE = [(0.00, math.radians(56)), (0.60, math.radians(50)),
+            (1.05, math.radians(38)), (1.45, math.radians(20)),
+            (2.10, math.radians(0)), (3.15, math.radians(-14))]
 
 
 def hairline_elev(a):
@@ -285,11 +291,57 @@ def hairline_elev(a):
     return HAIRLINE[-1][1]
 
 
-def lock(a, elev, flow, L, bend=(0, 0, 0), w0=0.013, thick=0.66, off=0.004,
+NA_CAP, NZ_CAP, R_CAP = 56, 14, 0.150
+cap_v, cap_f = [], []
+for j in range(NZ_CAP):
+    t = j / (NZ_CAP - 1)
+    for i in range(NA_CAP):
+        a = i / NA_CAP * 2 * math.pi
+        e = lerp(math.radians(89.5), hairline_elev(a), t ** 0.86)
+        cap_v.append(HEAD_C + Vector((math.sin(a) * math.cos(e),
+                                      -math.cos(a) * math.cos(e),
+                                      math.sin(e))) * R_CAP)
+for j in range(NZ_CAP - 1):
+    for i in range(NA_CAP):
+        i2 = (i + 1) % NA_CAP
+        cap_f.append([j * NA_CAP + i, j * NA_CAP + i2,
+                      (j + 1) * NA_CAP + i2, (j + 1) * NA_CAP + i])
+cm = bpy.data.meshes.new("Alonso_Pelo")
+cm.from_pydata([tuple(v) for v in cap_v], [], cap_f)
+cm.update()
+for poly in cm.polygons:
+    poly.use_smooth = True
+cap = bpy.data.objects.new("Alonso_Pelo", cm)
+bpy.context.collection.objects.link(cap)
+sw = cap.modifiers.new("Ajuste", 'SHRINKWRAP')
+sw.target = ob
+sw.wrap_method = 'NEAREST_SURFACEPOINT'
+sw.offset = 0.0062
+bpy.ops.object.select_all(action='DESELECT')
+bpy.context.view_layer.objects.active = cap
+cap.select_set(True)
+bpy.ops.object.modifier_apply(modifier=sw.name)
+print(f"[AL] casquete ajustado por shrinkwrap: {len(cm.vertices)} verts")
+
+# mechones: nacen en el casquete YA ajustado, así que la raíz está pegada
+HAIR = Build()
+cap_pt = [v.co.copy() for v in cm.vertices]
+
+
+def cap_at(a, t):
+    i = int(round(a / (2 * math.pi) * NA_CAP)) % NA_CAP
+    j = min(int(round(t * (NZ_CAP - 1))), NZ_CAP - 1)
+    p = cap_pt[j * NA_CAP + i]
+    n = (p - HEAD_C)
+    n.z *= 0.72
+    n.normalize()
+    return p, n
+
+
+def lock(a, t, flow, L, bend=(0, 0, 0), w0=0.013, thick=0.66, off=0.003,
          twist=0.0, root_out=0.10, taper=2.9, segs=8):
-    anchor, n = skull_dir(a, elev, off)
-    if anchor is None:
-        return
+    anchor, n = cap_at(a, t)
+    anchor = anchor + n * off
     d = Vector(flow).normalized()
     pts = [anchor + n * (L * root_out * (1.0 - (1.0 - i / (segs - 1)) ** 2))
            + d * (L * (i / (segs - 1))) + Vector(bend) * ((i / (segs - 1)) ** 2)
@@ -299,80 +351,63 @@ def lock(a, elev, flow, L, bend=(0, 0, 0), w0=0.013, thick=0.66, off=0.004,
     HAIR.add(V, F, 0, smooth=True)
 
 
-if RASGOS:
-    # casquete: nace en la línea del pelo, sin canto duro en la frente
-    rings = []
-    for j in range(13):
-        t = j / 12
-        ring = []
-        for i in range(52):
-            a = i / 52 * 2 * math.pi
-            e = lerp(math.radians(89), hairline_elev(a), t ** 0.86)
-            pt, _ = skull_dir(a, e, 0.0050 + 0.0040 * math.sin(t * math.pi) ** 0.8)
-            ring.append(tuple(pt) if pt else (0, 0, CROWN_Z))
-        rings.append(ring)
-    V, F = loft(rings, cap_start=False, cap_end=False)
-    HAIR.add(V, F, 0, smooth=True)
+for k in range(13):                                    # flequillo
+    tt = (k - 6) / 6.0
+    a = tt * 0.95
+    L = 0.030 + 0.011 * (1.0 - abs(tt))
+    lock(a % (2 * math.pi), 0.97, (tt * 0.30 + 0.22, -0.46, -0.82), L,
+         bend=(tt * 0.005 + 0.003, -0.004, -0.004),
+         w0=0.0128 + 0.0042 * (1.0 - abs(tt)), thick=0.58,
+         twist=random.uniform(-0.2, 0.2), taper=3.0)
 
-    # FLEQUILLO: cuñas cortas sobre la frente, con raya y barrido a un lado
-    for k in range(13):
-        t = (k - 6) / 6.0
-        a = t * 0.98
-        e = hairline_elev(a) - math.radians(4)
-        L = 0.028 + 0.010 * (1.0 - abs(t)) + random.uniform(-0.002, 0.002)
-        lock(a, e, (t * 0.30 + 0.22, -0.46, -0.82), L,
-             bend=(t * 0.005 + 0.003, -0.004, -0.004),
-             w0=0.0125 + 0.0042 * (1.0 - abs(t)), thick=0.58,
-             twist=random.uniform(-0.2, 0.2), off=0.0060, root_out=0.10, taper=3.0)
+for side in (-1, 1):                                   # enmarcan la cara
+    for k in range(2):
+        a = (side * (1.16 + k * 0.18)) % (2 * math.pi)
+        lock(a, 0.97, (side * 0.30, -0.18, -0.93), 0.046 + k * 0.012,
+             bend=(side * 0.005, -0.003, -0.010), w0=0.0108, thick=0.54,
+             twist=side * 0.2, taper=3.2)
 
-    # mechones que enmarcan la cara
-    for side in (-1, 1):
-        for k in range(2):
-            a = side * (1.16 + k * 0.18)
-            lock(a, hairline_elev(a) - math.radians(2 + k * 3),
-                 (side * 0.30, -0.18, -0.93), 0.044 + k * 0.012,
-                 bend=(side * 0.005, -0.003, -0.010), w0=0.0108, thick=0.54,
-                 twist=side * 0.2, off=0.0050, root_out=0.08, taper=3.2)
+SPIKES = [(0.00, 0.10, (0.04, 0.60, 0.80), 0.062), (0.55, 0.14, (0.28, 0.58, 0.77), 0.058),
+          (-0.55, 0.14, (-0.28, 0.58, 0.77), 0.058), (1.10, 0.20, (0.46, 0.46, 0.76), 0.054),
+          (-1.10, 0.20, (-0.46, 0.46, 0.76), 0.054), (1.65, 0.30, (0.56, 0.32, 0.76), 0.050),
+          (-1.65, 0.30, (-0.56, 0.32, 0.76), 0.050), (2.30, 0.26, (0.34, 0.70, 0.63), 0.056),
+          (-2.30, 0.26, (-0.34, 0.70, 0.63), 0.056), (2.80, 0.30, (0.14, 0.86, 0.49), 0.058),
+          (-2.80, 0.30, (-0.14, 0.86, 0.49), 0.058), (3.14, 0.34, (0.00, 0.92, 0.39), 0.056)]
+for (a, t, d, L) in SPIKES:
+    aa = a % (2 * math.pi)
+    lock(aa, t, d, L, bend=(d[0] * 0.012, 0.016, -0.012), w0=0.0180, thick=0.74,
+         twist=random.uniform(-0.25, 0.25), root_out=0.15, taper=2.7)
+    lock((aa + 0.26) % (2 * math.pi), t + 0.10,
+         (d[0] * 0.92, d[1] * 0.90, d[2] * 0.84), L * 0.72,
+         bend=(d[0] * 0.008, 0.012, -0.010), w0=0.0126, thick=0.68,
+         twist=random.uniform(-0.25, 0.25), root_out=0.12, taper=2.9)
 
-    # PÚAS de coronilla: arriba y atrás
-    SPIKES = [(0.00, 80, (0.04, 0.60, 0.80), 0.062), (0.55, 76, (0.28, 0.58, 0.77), 0.058),
-              (-0.55, 76, (-0.28, 0.58, 0.77), 0.058), (1.10, 68, (0.46, 0.46, 0.76), 0.054),
-              (-1.10, 68, (-0.46, 0.46, 0.76), 0.054), (1.65, 58, (0.56, 0.32, 0.76), 0.050),
-              (-1.65, 58, (-0.56, 0.32, 0.76), 0.050), (2.30, 62, (0.34, 0.70, 0.63), 0.056),
-              (-2.30, 62, (-0.34, 0.70, 0.63), 0.056), (2.80, 55, (0.14, 0.86, 0.49), 0.058),
-              (-2.80, 55, (-0.14, 0.86, 0.49), 0.058), (3.14, 50, (0.00, 0.92, 0.39), 0.056)]
-    for (a, ed, d, L) in SPIKES:
-        e = math.radians(ed)
-        lock(a, e, d, L, bend=(d[0] * 0.012, 0.016, -0.012), w0=0.0180, thick=0.74,
-             twist=random.uniform(-0.25, 0.25), off=0.0075, root_out=0.15, taper=2.7)
-        lock(a + 0.26, e - math.radians(7), (d[0] * 0.92, d[1] * 0.90, d[2] * 0.84),
-             L * 0.72, bend=(d[0] * 0.008, 0.012, -0.010), w0=0.0126, thick=0.68,
-             twist=random.uniform(-0.25, 0.25), off=0.0068, root_out=0.12, taper=2.9)
+for k in range(20):                                    # capa media
+    a = (k / 20) * 2 * math.pi
+    lock(a, 0.55 + 0.18 * abs(math.sin(k * 1.3)),
+         (math.sin(a) * 0.34, -math.cos(a) * 0.34 + 0.26,
+          -0.62 if abs(((a + math.pi) % (2 * math.pi)) - math.pi) < 1.4 else 0.16),
+         0.034 + random.uniform(0.0, 0.012), w0=0.0102, thick=0.62,
+         twist=random.uniform(-0.3, 0.3), root_out=0.08, taper=3.0)
 
-    # capa media y nuca
-    for k in range(20):
-        a = -math.pi + (k / 20) * 2 * math.pi + 0.11
-        e = lerp(math.radians(48), hairline_elev(a) + math.radians(8), 0.35)
-        _, n = skull_dir(a, e)
-        if n is None:
-            continue
-        lock(a, e, (n.x * 0.36, n.y * 0.36 + 0.28, -0.62 if abs(a) < 1.4 else 0.16),
-             0.034 + random.uniform(0.0, 0.012), bend=(n.x * 0.003, 0.006, -0.004),
-             w0=0.0102, thick=0.62, twist=random.uniform(-0.3, 0.3),
-             off=0.0045, root_out=0.08, taper=3.0)
-    for k in range(11):
-        t = (k - 5) / 5.0
-        a = math.pi + t * 0.95
-        lock(a, hairline_elev(a) + math.radians(10), (t * 0.20, 0.28, -0.94),
-             0.046 + 0.016 * (1.0 - abs(t)), bend=(t * 0.003, 0.006, -0.008),
-             w0=0.0112, thick=0.62, twist=random.uniform(-0.2, 0.2),
-             off=0.0050, root_out=0.08, taper=3.0)
+for k in range(11):                                    # nuca
+    tt = (k - 5) / 5.0
+    a = (math.pi + tt * 0.95) % (2 * math.pi)
+    lock(a, 0.90, (tt * 0.20, 0.28, -0.94), 0.046 + 0.016 * (1.0 - abs(tt)),
+         bend=(tt * 0.003, 0.006, -0.008), w0=0.0112, thick=0.62,
+         twist=random.uniform(-0.2, 0.2), root_out=0.08, taper=3.0)
 
-    PELO_OB = HAIR.finish("Alonso_Pelo", [PELO])
-    PELO_OB.game.physics_type = 'NO_COLLISION'
-    print(f"[AL] pelo: {len(PELO_OB.data.polygons)} caras")
-else:
-    print("[AL] rasgos desactivados: solo cuerpo estilizado + materiales")
+locks_ob = HAIR.finish("Alonso_Mechones", [PELO])
+cm.materials.append(PELO)
+bpy.ops.object.select_all(action='DESELECT')   # o el join se lleva el cuerpo
+bpy.context.view_layer.objects.active = locks_ob
+for o in (cap, locks_ob):
+    o.select_set(True)
+bpy.ops.object.join()
+bpy.context.view_layer.objects.active.name = "Alonso_Pelo"
+PELO_OB = bpy.context.view_layer.objects.active
+PELO_OB.game.physics_type = 'NO_COLLISION'
+print(f"[AL] pelo: {len(PELO_OB.data.polygons)} caras")
 
 ob.game.physics_type = 'NO_COLLISION'
 bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)

@@ -240,6 +240,44 @@ if moved:
     me.update()
     print(f"[EST] relajados {len(target)} verts ({len(frozen)} de borde intactos)")
 
+# --- 5b: ojos, del pack CC0 de MakeHuman ---------------------------------------
+# Vienen ajustados a ESTA malla base, así que no hay que adivinar el encaje. Se
+# les aplica la MISMA deformación y normalización que a la cabeza, y así siguen
+# encajando después de estilizar. Unidades MakeHuman: Y arriba, factor 0.1.
+EYE_OBJ = os.path.join(HERE, "assets", "eyes", "high-poly", "high-poly.obj")
+eye_v, eye_f, eye_vt, eye_fuv = [], [], [], []
+if os.path.exists(EYE_OBJ):
+    for line in open(EYE_OBJ):
+        if line.startswith("v "):
+            a, b, c = (float(t) for t in line.split()[1:4])
+            eye_v.append(Vector((a * 0.1, -c * 0.1, b * 0.1)))
+        elif line.startswith("vt "):
+            u, vv = (float(t) for t in line.split()[1:3])
+            eye_vt.append((u, vv))
+        elif line.startswith("f "):
+            toks = line.split()[1:]
+            eye_f.append([int(t.split("/")[0]) - 1 for t in toks])
+            eye_fuv.append([int(t.split("/")[1]) - 1 if "/" in t and t.split("/")[1]
+                            else 0 for t in toks])
+    mid = sum((v.x for v in eye_v)) / len(eye_v)
+    left = [v for v in eye_v if v.x > mid]
+    right = [v for v in eye_v if v.x <= mid]
+    cL = sum(left, Vector()) / len(left)
+    cR = sum(right, Vector()) / len(right)
+    print(f"[EST] ojos CC0: {len(eye_v)} verts, centro neutro {tuple(round(c,4) for c in cL)}")
+    # El globo se TRASLADA y se escala UNIFORME. Pasarlo por style_delta entero
+    # lo estiraría 2,15x en vertical junto con su iris (el campo de ojo es
+    # anisótropo a propósito, para abrir el párpado), y el ojo salía negro.
+    EYEBALL_SCALE = 1.18
+    moved = []
+    for v in eye_v:
+        izq = v.x > mid
+        base = cL if izq else cR
+        tgt = L_EYE if izq else R_EYE
+        ctr = tgt + style_delta(tgt)               # dónde acaba el centro del ojo
+        moved.append(ctr + (v - base) * EYEBALL_SCALE)
+    eye_v = moved
+
 # --- 6: estatura final y referencias para el resto del pipeline --------------
 zs = [v.co.z for v in me.vertices]
 zmin, zmax = min(zs), max(zs)
@@ -256,6 +294,24 @@ def to_final(pt):
 
 
 LE, RE = to_final(L_EYE), to_final(R_EYE)
+if eye_v:
+    em = bpy.data.meshes.new("Alonso_Ojos")
+    em.from_pydata([( v.x * k, v.y * k, (v.z - zmin) * k) for v in eye_v], [], eye_f)
+    em.update()
+    for poly in em.polygons:
+        poly.use_smooth = True
+    if eye_vt:                       # las UV traen el iris pintado en la textura
+        uvl = em.uv_layers.new(name="UVMap")
+        li = 0
+        for pi, poly in enumerate(em.polygons):
+            for k in range(len(poly.vertices)):
+                uvl.data[li].uv = eye_vt[eye_fuv[pi][k]]
+                li += 1
+    eo = bpy.data.objects.new("Alonso_Ojos", em)
+    bpy.context.collection.objects.link(eo)
+    eo.game.physics_type = 'NO_COLLISION'
+    print(f"[EST] ojos colocados: {len(em.vertices)} verts, {len(em.polygons)} caras")
+
 h["ALONSO_L_EYE"] = tuple(LE)
 h["ALONSO_R_EYE"] = tuple(RE)
 h["ALONSO_EYE_SEP"] = (LE - RE).length
