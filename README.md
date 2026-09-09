@@ -21,13 +21,16 @@ también nacen los sueños más brillantes.
 ## Estado
 
 Vertical slice en construcción. Nada de esto es definitivo.
+La evolución de cada pieza, con imágenes, está en la **[bitácora](bitacora/)**.
+
+![El molino al atardecer](bitacora/img/molino-heroe.jpg)
 
 | Pieza | Estado |
 |---|---|
 | Terreno 1 — La Mancha | mapa jugable: pueblo, camino, arroyo, molinos |
 | El Molino | pieza héroe: 661 tejas colocadas una a una, aspas de celosía |
 | Interior del Molino | la casa del panadero: horno de bóveda de 213 ladrillos |
-| Alonso Quijano | **en curso** — base procedural descartada, ver más abajo |
+| Alonso Quijano | **en curso** — [base procedural descartada](bitacora/04-alonso.md) |
 
 ## Cómo está construido
 
