@@ -112,6 +112,42 @@ Guardado en `anima/assets/` con su `LICENCIA.md`.
 
 ---
 
+## v4 — gramática facial del género
+
+Dirección: facciones y ojos de JRPG. Eso es **estilo**, no diseño: proporciones
+y lenguaje visual del género. Alonso sigue siendo suyo — su pelo, su color de
+ojos, su cara.
+
+| v3: ojo esférico realista | v4: ojo plano de género |
+|---|---|
+| ![v3](img/alonso-v3-cara.jpg) | ![v4](img/alonso-v4-cara.jpg) |
+
+**El ojo pasa a ser plano.** Un globo esférico realista, por muy bien ajustado
+que esté, deja una almendra oscura: el iris llena el hueco y no asoma
+esclerótica. Los ojos de este estilo son **geometría plana** con esclerótica,
+iris grande, pupila y brillos como piezas separadas. Ahora hay eso, más línea de
+pestaña y ceja.
+
+**Y va como calcomanía, sin recortar el párpado.** Se probó a abrir un hueco en
+la piel: en una malla de rejilla el borde queda escalonado, y taparlo con la
+pestaña resultó frágil. Como la cara ya está aplanada en la zona del ojo, el ojo
+se apoya encima, un pelo por delante. El contorno lo define el propio ojo, así
+que sale limpio.
+
+**La cara se aplana.** Se añadió un campo que rebaja el relieve del plano facial
+en la zona de pómulo y ceja. Ese relieve es lo que la hacía leer como adulta
+realista; los rasgos de este estilo van sobre una cara plana. Además: cabeza al
+115 %, apertura del ojo 2,85× en vertical, nariz al 32 %, boca al 78 %.
+
+### Tres tropiezos de esta tanda
+
+- `(1 - sc²) ** 0.6` con `sc > 1` da **base negativa y exponente fraccionario**:
+  Python devuelve un complejo y Blender casca al asignarlo a un vector.
+- La esclerótica iba **0,6 mm** por delante de la pestaña y la tapaba entera.
+- La pestaña superior creció tanto que **se confundía con la ceja**.
+
+---
+
 ## Lo que sigue sin estar
 
 - **La mirada no lee.** El iris llena toda la apertura del párpado y el ojo queda

@@ -35,11 +35,11 @@ IN_BLEND = os.path.join(HERE, "AlonsoBase.blend")
 OUT_BLEND = os.path.join(HERE, "AlonsoEstilo.blend")
 
 # --- cuánto se estiliza -------------------------------------------------------
-HEAD_SCALE = 1.130      # cabeza algo mayor: lectura juvenil, no chibi
-EYE_WIDE = 1.48         # el ojo se ensancha...
-EYE_TALL = 2.15         # ...y sobre todo SE ABRE: eso es lo que lo hace JRPG
-NOSE_SHRINK = 0.44      # nariz pequeña, casi insinuada
-MOUTH_SHRINK = 0.84
+HEAD_SCALE = 1.155      # cabeza algo mayor: lectura juvenil, no chibi
+EYE_WIDE = 1.58         # el ojo se ensancha...
+EYE_TALL = 2.85         # ...y sobre todo SE ABRE: eso es lo que lo hace JRPG
+NOSE_SHRINK = 0.32      # nariz pequeña, casi insinuada
+MOUTH_SHRINK = 0.78
 HAND_GROW = 1.10        # manos y pies algo exagerados ayudan a la silueta
 HEIGHT_TARGET = 1.680
 
@@ -198,6 +198,13 @@ def style_delta(p):
         delta_i.z += 0.020 * w
         delta_i.y += 0.005 * w
 
+    # Aplanado del plano facial. Los rasgos anime van sobre una cara PLANA:
+    # el relieve de pómulo y ceja es lo que la hace leer como adulta realista.
+    if p.y < -0.02 and p.z > CHIN_Z - 0.02:
+        fw = smoothstep(1.0, 0.0, clamp01(ellip(p - Vector((0.0, -0.085, EYE_Z0 - 0.020)),
+                                                0.085, 0.075, 0.090)))
+        delta_i.y += (-0.128 - p.y) * 0.30 * fw
+
     # cráneo más lleno arriba y frente algo mayor
     d = p - Vector((0.0, -0.015, CROWN_Z - 0.055))
     w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.100, 0.110, 0.080)))
@@ -268,7 +275,7 @@ if os.path.exists(EYE_OBJ):
     # El globo se TRASLADA y se escala UNIFORME. Pasarlo por style_delta entero
     # lo estiraría 2,15x en vertical junto con su iris (el campo de ojo es
     # anisótropo a propósito, para abrir el párpado), y el ojo salía negro.
-    EYEBALL_SCALE = 1.18
+    EYEBALL_SCALE = 1.0
     moved = []
     for v in eye_v:
         izq = v.x > mid

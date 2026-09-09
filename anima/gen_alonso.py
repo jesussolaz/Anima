@@ -153,122 +153,109 @@ def skull_at(direction):
 
 
 # ----------------------------------------------------------------- OJOS
-EW, EH = 0.0205, 0.0142          # semiejes del ojo (grande: lectura JRPG)
+# Gramática del género: el ojo NO es un globo realista asomando, es geometría
+# PLANA con esclerótica, iris grande, pupila y brillos como piezas separadas.
+# Y la LÍNEA DE PESTAÑA gruesa alrededor del hueco es lo que da la mirada — y de
+# paso tapa el borde del recorte, que en una malla de rejilla queda escalonado.
+
+_viejo = bpy.data.objects.get("Alonso_Ojos")
+if _viejo:                       # el globo esférico del pack ya no se usa
+    bpy.data.objects.remove(_viejo, do_unlink=True)
+    print("[AL] globo esférico retirado: el ojo pasa a ser plano")
+
+L_EYE = Vector(ob["ALONSO_L_EYE"])
+R_EYE = Vector(ob["ALONSO_R_EYE"])
+EW, EH = 0.0212, 0.0150          # semiejes del hueco del párpado
+
+
+def eye_mask(x, z, c):
+    """<1 dentro del hueco. Lagrimal bajo y afilado, rabillo levemente alto."""
+    u = (abs(x) - abs(c.x)) / EW
+    v = (z - c.z - 0.0028 * u) / EH
+    v = v / (1.0 + 0.26 * clamp01(-v))          # párpado inferior más plano
+    return math.sqrt(u * u * (1.0 + 0.10 * max(v, 0.0)) + v * v)
+
+
+# NO se recorta el párpado. Recortar en una malla de rejilla deja el borde
+# escalonado, y taparlo con la pestaña resultó frágil. Como la cara ya está
+# aplanada en la zona del ojo, el ojo va como CALCOMANÍA: geometría plana
+# apoyada sobre la piel, un pelo por delante. El contorno lo define el ojo, así
+# que sale limpio, y la pestaña lo remata.
 EYES = Build()
+EYE_MATS = [ESCLERA, IRIS, PESTANA, CEJA]
 
 
-def rim_xz(side, t):
-    """Contorno almendrado: lagrimal bajo y afilado, rabillo alto."""
-    a = t * 2 * math.pi
-    c, sn = math.cos(a), math.sin(a)
-    cx, cz = (L_EYE.x if side > 0 else R_EYE.x), L_EYE.z
-    hz = EH * (1.0 if sn >= 0 else 0.80)          # párpado inferior más plano
-    x = cx + c * EW * side
-    z = cz + (abs(sn) ** 1.18) * (1 if sn >= 0 else -1) * hz
-    z += 0.0022 * c * side * (1 if side > 0 else 1)   # el rabillo remonta
-    return x, z
+def build_eye(ctr, side):
+    surf = face_at(ctr.x, ctr.z)
+    fy = (surf.y if surf else ctr.y)
 
+    def ell(rx, rz, depth, n=48):
+        return [(ctr.x + math.cos(i / n * 2 * math.pi) * rx, fy - depth,
+                 ctr.z + math.sin(i / n * 2 * math.pi) * rz) for i in range(n)]
 
-def build_eye(side):
-    cx = L_EYE.x if side > 0 else R_EYE.x
-    cz = L_EYE.z
-    N = 44
-    rim = [rim_xz(side, i / N) for i in range(N)]
+    # esclerótica: elipse plana, apenas abombada
+    rings = []
+    for sc in (1.00, 0.82, 0.60, 0.34, 0.02):
+        d = 0.0016 + 0.0030 * clamp01(1.0 - sc * sc) ** 0.6
+        rings.append(ell(EW * sc, EH * sc, d))
+    V, F = loft(rings, cap_start=False, cap_end=True)
+    EYES.add(V, F, 0, smooth=True)
 
-    def patch(scales, bulge, mat, tint=None, lift=0.0):
-        rings = []
-        for sc in scales:
-            ring = []
-            for (px, pz) in rim:
-                qx, qz = cx + (px - cx) * sc, cz + (pz - cz) * sc
-                surf = face_at(qx, qz)
-                base_y = surf.y if surf else L_EYE.y
-                b = bulge * (1.0 - sc * sc) ** 0.60 + lift
-                ring.append((qx, base_y - 0.0004 - b, qz))
-            rings.append(ring)
-        V, F = loft(rings, cap_start=False, cap_end=True)
-        EYES.add(V, F, mat_index(mat), smooth=True, tint=tint)
-
-    patch([1.0, 0.90, 0.76, 0.58, 0.38, 0.16], 0.0040, ESCLERA)
-
-    surf = face_at(cx, cz)
-    ey = (surf.y if surf else L_EYE.y) - 0.0004 - 0.0040
-    IR = 0.0104
-
-    def iris_ring(sc, lift):
-        out = []
-        for i in range(30):
-            a = i / 30 * 2 * math.pi
-            px = cx + math.cos(a) * IR * sc
-            pz = cz + math.sin(a) * IR * sc * 1.06
-            sp = face_at(px, pz)
-            byy = (sp.y if sp else L_EYE.y) - 0.0004
-            m = min(math.hypot((px - cx) / EW, (pz - cz) / EH), 1.0)
-            out.append((px, byy - 0.0040 * (1 - m * m) ** 0.60 - lift, pz))
-        return out
-
-    for (s0, s1, mat, tint) in ((1.00, 0.94, IRIS, (0.20, 0.22, 0.24)),
-                                (0.94, 0.60, IRIS, (1.00, 1.06, 1.00)),
-                                (0.60, 0.32, IRIS, (1.75, 1.90, 1.70)),
-                                (0.32, 0.09, IRIS, (0.14, 0.14, 0.14))):
-        V, F = loft([iris_ring(s0, 0.0009), iris_ring(s1, 0.0016)],
+    # iris grande, anillo limbal, pupila y dos brillos
+    IR = 0.0094
+    for (s0, s1, mat, tint) in ((1.00, 0.90, 1, (0.16, 0.18, 0.22)),
+                                (0.90, 0.46, 1, (1.00, 1.06, 1.00)),
+                                (0.46, 0.30, 1, (1.85, 2.00, 1.80)),
+                                (0.30, 0.06, 3, (0.10, 0.10, 0.12))):
+        V, F = loft([ell(IR * s0, IR * s0 * 1.06, 0.0050 + 0.0012 * (1 - s0), 30),
+                     ell(IR * s1, IR * s1 * 1.06, 0.0050 + 0.0012 * (1 - s1), 30)],
                     cap_start=False, cap_end=True)
-        EYES.add(V, F, mat_index(mat), smooth=True, tint=(tint if tint else None))
-
-    for (hx, hz, hr) in ((-0.0046, 0.0058, 0.0034), (0.0054, -0.0048, 0.0017)):
+        EYES.add(V, F, mat, smooth=True, tint=tint)
+    for (hx, hz, hr, hi) in ((-0.0040, 0.0050, 0.0031, 14.0),
+                             (0.0046, -0.0042, 0.0016, 4.0)):
         hv, hf = ico(2)
-        px, pz = cx + hx * side, cz + hz
-        sp = face_at(px, pz)
-        py = (sp.y if sp else L_EYE.y) - 0.0060
-        EYES.add([(x * hr + px, y * hr * 0.45 + py, z * hr + pz) for (x, y, z) in hv],
-                 hf, mat_index(BRILLO), smooth=True)
+        EYES.add([(x * hr + ctr.x + hx * side, y * hr * 0.4 + fy - 0.0064,
+                   z * hr + ctr.z + hz) for (x, y, z) in hv], hf, 0,
+                 smooth=True, tint=(hi, hi, hi))
 
-    # PESTAÑA superior: gruesa y remontada en el rabillo. Es lo que da la mirada.
-    r0, r1 = [], []
-    for k in range(N // 2 + 1):
-        t = k / (N // 2) * 0.5
-        px, pz = rim_xz(side, t)
-        surf = face_at(px, pz)
-        byy = (surf.y if surf else L_EYE.y)
-        outer = 1.0 - abs(t - 0.0) / 0.5
-        w = 0.0022 + 0.0060 * ((1.0 - t / 0.5) ** 2.0) + 0.0024 * math.sin(math.pi * t / 0.5)
-        d = Vector((px - cx, 0.0, pz - cz))
-        d = d.normalized() if d.length > 1e-6 else Vector((0, 0, 1))
-        r0.append((px - d.x * 0.0014, byy - 0.0026, pz - d.z * 0.0014))
-        r1.append((px + d.x * w * 0.5, byy - 0.0034, pz + d.z * w))
-    V, F = loft([r0, r1], cap_start=False, cap_end=False)
-    EYES.add(V, F, mat_index(PESTANA), smooth=True)
+    # LÍNEA DE PESTAÑA: gruesa arriba, remontando en el rabillo. Da la mirada y
+    # remata el contorno del ojo.
+    inner, outer = [], []
+    for i in range(65):
+        a = i / 64 * 2 * math.pi
+        ca, sa = math.cos(a), math.sin(a)
+        upper = clamp01(sa)
+        t = clamp01((ca * side + 1.0) * 0.5)
+        # la pestaña tiene que ir claramente DELANTE de la esclerótica, o esta
+        # la tapa: hay menos de un milímetro entre las dos
+        w = 0.0018 + 0.0026 * upper + 0.0044 * (t ** 2.0) * upper
+        inner.append((ctr.x + ca * EW * 0.965, fy - 0.0062, ctr.z + sa * EH * 0.965))
+        outer.append((ctr.x + ca * (EW * 0.965 + w), fy - 0.0034,
+                      ctr.z + sa * (EH * 0.965 + w)))
+    V, F = loft([inner, outer], cap_start=False, cap_end=False)
+    EYES.add(V, F, 2, smooth=True)
 
     # ceja
     b0, b1 = [], []
-    bc = [(0.42, 0.0295), (0.78, 0.0350), (1.20, 0.0352), (1.62, 0.0300),
-          (1.88, 0.0232)]
-    pts = catmull([Vector((cx * f, 0.0, cz + dz)) for (f, dz) in bc], 16)
-    for i, q in enumerate(pts):
-        t = i / (len(pts) - 1)
-        w = 0.0034 * (0.26 + 0.94 * math.sin(math.pi * clamp01(t * 1.04)) ** 0.5)
-        surf = face_at(q.x, q.z)
-        byy = (surf.y if surf else L_EYE.y)
-        b0.append((q.x, byy - 0.0012, q.z - w))
-        b1.append((q.x, byy - 0.0032, q.z + w * 0.78))
+    for i in range(16):
+        t = i / 15
+        ang = math.pi * (0.92 - 0.84 * t)
+        px = ctr.x + math.cos(ang) * EW * 1.34 * side
+        pz = ctr.z + EH * 1.44 + math.sin(ang) * EH * 0.34
+        sp = face_at(px, pz)
+        byy = (sp.y if sp else fy) - 0.0014
+        w = 0.0028 * (0.24 + 0.96 * math.sin(math.pi * clamp01(t * 1.05)) ** 0.55)
+        b0.append((px, byy, pz - w))
+        b1.append((px, byy - 0.0018, pz + w * 0.8))
     V, F = loft([b0, b1], cap_start=False, cap_end=False)
-    EYES.add(V, F, mat_index(CEJA), smooth=True)
+    EYES.add(V, F, 3, smooth=True)
 
 
-EYE_MATS = [ESCLERA, IRIS, PESTANA, CEJA, BRILLO]
-
-
-def mat_index(m):
-    return EYE_MATS.index(m)
-
-
-if RASGOS:
-    build_eye(1)
-    build_eye(-1)
-if RASGOS:
-    OJOS = EYES.finish("Alonso_Ojos", EYE_MATS)
-    OJOS.game.physics_type = 'NO_COLLISION'
-    print(f"[AL] ojos: {len(OJOS.data.polygons)} caras")
+build_eye(L_EYE, 1)
+build_eye(R_EYE, -1)
+OJOS = EYES.finish("Alonso_Ojos", EYE_MATS)
+OJOS.game.physics_type = 'NO_COLLISION'
+print(f"[AL] ojos planos (calcomanía): {len(OJOS.data.polygons)} caras")
 
 # ----------------------------------------------------------------- PELO
 # Ajuste por SHRINKWRAP, no por raycast. Un rayo desde el centro de la cabeza
