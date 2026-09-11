@@ -218,6 +218,41 @@ masa diseñada. Eso es lo próximo.
 
 ---
 
+## v7 — el pelo, rehecho contra un número medido
+
+El pelo se rehízo con un objetivo sacado de medir peinados CC0 profesionales:
+**3-5 piezas, ~1.500 triángulos**. El anterior tenía 7.784 tris en 73 trozos.
+
+| | Antes | **Ahora** | Referencia profesional |
+|---|---|---|---|
+| Triángulos | 7.784 | **~800** | 1.301 |
+| Piezas sueltas | 73 | **1** | 3 |
+
+### El cambio de concepto
+
+Las púas **ya no son conos independientes**. Son parte de **una sola superficie
+continua** cuyo borde se modula para acabar en puntas. La silueta la define el
+contorno de esa superficie — que es justo lo que juzga la prueba.
+
+Construcción: anillos pegados al cráneo con Shrinkwrap, y a partir del último
+anillo, filas libres que caen y se afilan. El largo de cada punta lo marca una
+función periódica de potencia alta (picos estrechos, valles anchos), y el
+volumen es mayor arriba y atrás que en la frente.
+
+### La prueba de la silueta, antes y después
+
+| Antes: fleco de púas | **Ahora: masa con puntas** |
+|---|---|
+| ![antes](img/alonso-silueta-cabeza.jpg) | ![ahora](img/alonso-silueta-pelo-nuevo.jpg) |
+
+![v7](img/alonso-v7-cara.jpg)
+
+La lección, que vale para todo lo demás: **el problema no era hacer mejores
+mechones, era tener muchos menos y más grandes**. Llevaba meses optimizando en
+la dirección contraria, y solo se vio al medir un peinado bien hecho.
+
+---
+
 ## Lo que sigue sin estar
 
 - **La mirada no lee.** El iris llena toda la apertura del párpado y el ojo queda
