@@ -86,6 +86,26 @@ Cómo se hace en Blender:
 - O el complemento **Abnormal**, o la función "Sphereize Normals", moviendo la
   esfera hasta que las normales de la nariz apunten al frente.
 
+## Lo aprendido al aplicarlo
+
+Tres cosas que no decía ninguna guía y salieron al hacerlo:
+
+1. **El tinte de sombra se MEZCLA en RGB, no se suma al matiz.** Sumar +0,075 de
+   matiz a un marrón (matiz ~0,05) lo lleva al **amarillo-verde**, no al azul: el
+   pelo salió verde oliva. Mezclar el color con un tinte objetivo funciona sea
+   cual sea el color de partida.
+2. **El cuerpo no debe proyectar sombra sobre sí mismo.** Las normales
+   esferizadas arreglan el SOMBREADO, pero la nariz seguía tirando una sombra
+   PROYECTADA rota sobre la mejilla. Con `visible_shadow = False` en el cuerpo
+   desaparece, y el pelo sigue proyectando sobre la cara — que sí interesa.
+3. **El ángulo de luz decide dónde cae la sombra del flequillo.** Con la luz a
+   45° cruzaba la cara en diagonal y quedaba fea. Más frontal y alta
+   (≈ `(0.20, 0.80, -0.56)` de dirección de viaje) la deja en la frente, que es
+   donde toca.
+
+Grosor de contorno calibrado para un personaje de 1,68 m: **1,3 mm** en el
+cuerpo, 1,6 mm en el pelo, 0,6 mm en los ojos.
+
 ## Fuentes
 
 - [How to Get an Anime / Toon Look in Blender (2026) — StraySpark](https://www.strayspark.studio/blog/how-to-get-anime-toon-look-blender)

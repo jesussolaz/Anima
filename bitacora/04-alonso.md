@@ -253,6 +253,39 @@ la dirección contraria, y solo se vio al medir un peinado bien hecho.
 
 ---
 
+## v8 — sombreado toon: el fallo de fondo
+
+Los personajes se venían sombreando con **PBR realista**. Este estilo no se
+sombrea así: por bien modelada que esté una cara, con PBR parece una figura de
+plástico fotografiada.
+
+![Toon](img/alonso-toon-cara.jpg)
+![Cuerpo](img/alonso-toon-cuerpo.jpg)
+
+Lo aplicado, todo de la [ficha 11](../conocimiento/11-sombreado-toon.md):
+
+- **`View Transform` de AgX a `Standard`.** AgX está hecho para fotorrealismo y
+  comprime los colores planos y saturados del estilo. **Todos** los renders de
+  personaje anteriores se hicieron con AgX.
+- **Cel shader**: `Diffuse BSDF → Shader to RGB → Color Ramp en Constant`.
+  Piel a 3 bandas, el resto a 2.
+- **Sombra con desplazamiento de tono**: piel al cálido, resto al azul.
+- **Un solo Sun**, frontal y alto.
+- **Normales de la cara esferizadas** por Data Transfer desde una esfera, contra
+  el *blob face*.
+- **El cuerpo no proyecta sombra sobre sí mismo**; el pelo sí sobre la cara.
+- **Contorno por casco invertido**: Solidify negativo + Flip + material negro con
+  Backface Culling.
+
+### Tres tropiezos al aplicarlo
+
+- El pelo salió **verde oliva**: sumar matiz a un marrón lo lleva al amarillo. El
+  tinte de sombra hay que mezclarlo en RGB.
+- Con la luz mal orientada, casi toda la cara caía en banda de sombra.
+- La sombra del flequillo cruzaba la cara en diagonal hasta poner la luz frontal.
+
+---
+
 ## Lo que sigue sin estar
 
 - **La mirada no lee.** El iris llena toda la apertura del párpado y el ojo queda

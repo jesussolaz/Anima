@@ -40,8 +40,82 @@ CROWN_Z = ob["ALONSO_CROWN_Z"]
 HEIGHT = ob["ALONSO_HEIGHT"]
 
 
+def sombra_de(color, calida=False, fuerza=0.62):
+    """El color de sombra DESPLAZA EL TONO, no solo oscurece (conocimiento/11).
+    Piel hacia el rojo; el resto hacia el azul/púrpura.
+
+    NO se hace sumando al matiz: sumarle a un marrón (matiz ~0,05) lo lleva al
+    amarillo-verde, no al azul. Se MEZCLA hacia un tinte objetivo en RGB, que
+    funciona sea cual sea el color de partida.
+    """
+    tinte = (0.62, 0.26, 0.20) if calida else (0.24, 0.26, 0.48)
+    k = 0.30
+    return tuple(max(0.0, min(1.0, c * fuerza * (1 - k) + t * k * fuerza))
+                 for c, t in zip(color, tinte))
+
+
+def toon(name, color, calida=False, bandas=2, fuerza=0.62, spec=0.0,
+         aniso=False):
+    """Cel shader de EEVEE: Diffuse BSDF -> Shader to RGB -> Color Ramp en
+    CONSTANT. Sin esto los personajes salen como figuras de plástico
+    fotografiadas: el PBR realista no sirve para este estilo."""
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    dif = nt.nodes.new("ShaderNodeBsdfDiffuse")
+    dif.inputs["Color"].default_value = (1, 1, 1, 1)
+    s2r = nt.nodes.new("ShaderNodeShaderToRGB")      # la pieza clave, solo EEVEE
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    ramp.color_ramp.interpolation = 'CONSTANT'       # bandas duras, no degradado
+    som = sombra_de(color, calida, fuerza)
+    med = sombra_de(color, calida, (fuerza + 1.0) * 0.5)
+    ramp.color_ramp.elements[0].position = 0.0
+    ramp.color_ramp.elements[0].color = (*som, 1.0)
+    if bandas >= 3:
+        e = ramp.color_ramp.elements.new(0.36)
+        e.color = (*med, 1.0)
+    ramp.color_ramp.elements[-1].position = 0.52
+    ramp.color_ramp.elements[-1].color = (*color, 1.0)
+    emi = nt.nodes.new("ShaderNodeEmission")
+    nt.links.new(dif.outputs["BSDF"], s2r.inputs["Shader"])
+    nt.links.new(s2r.outputs["Color"], ramp.inputs["Fac"])
+    salida = ramp.outputs["Color"]
+
+    if spec > 0.0:
+        # brillo: en el pelo es una BANDA que recorre la cabeza, no un punto
+        gl = nt.nodes.new("ShaderNodeBsdfGlossy")
+        gl.inputs["Roughness"].default_value = 0.22 if not aniso else 0.38
+        if aniso and "Anisotropy" in gl.inputs:
+            gl.inputs["Anisotropy"].default_value = 0.85
+        g2r = nt.nodes.new("ShaderNodeShaderToRGB")
+        gramp = nt.nodes.new("ShaderNodeValToRGB")
+        gramp.color_ramp.interpolation = 'CONSTANT'
+        gramp.color_ramp.elements[0].position = 0.0
+        gramp.color_ramp.elements[0].color = (0, 0, 0, 1)
+        gramp.color_ramp.elements[1].position = 0.62
+        gramp.color_ramp.elements[1].color = (spec, spec, spec, 1.0)
+        add = nt.nodes.new("ShaderNodeMix")
+        add.data_type = 'RGBA'
+        add.blend_type = 'ADD'
+        add.inputs["Factor"].default_value = 1.0
+        nt.links.new(gl.outputs["BSDF"], g2r.inputs["Shader"])
+        nt.links.new(g2r.outputs["Color"], gramp.inputs["Fac"])
+        nt.links.new(salida, add.inputs["A"])
+        nt.links.new(gramp.outputs["Color"], add.inputs["B"])
+        salida = add.outputs["Result"]
+
+    nt.links.new(salida, emi.inputs["Color"])
+    nt.links.new(emi.outputs["Emission"], out.inputs["Surface"])
+    m.diffuse_color = (*color, 1.0)
+    return m
+
+
 def pbr(name, color, rough=0.6, metallic=0.0, sss=0.0, sss_col=None,
         sss_rad=None, aniso=0.0, coat=0.0, sheen=0.0, emit=None, emit_str=0.0):
+    """Solo para lo que NO es personaje (ojo con textura)."""
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     b = m.node_tree.nodes["Principled BSDF"]
@@ -52,20 +126,6 @@ def pbr(name, color, rough=0.6, metallic=0.0, sss=0.0, sss_col=None,
     st("Base Color", (*color, 1.0))
     st("Roughness", rough)
     st("Metallic", metallic)
-    if sss:
-        st("Subsurface Weight", sss)
-        st("Subsurface Scale", 0.010)
-        if sss_col:
-            st("Subsurface Color", (*sss_col, 1.0))
-        if sss_rad:
-            st("Subsurface Radius", sss_rad)
-    if aniso:
-        st("Anisotropic", aniso)
-    if coat:
-        st("Coat Weight", coat)
-        st("Coat Roughness", 0.16)
-    if sheen:
-        st("Sheen Weight", sheen)
     if emit:
         st("Emission Color", (*emit, 1.0))
         st("Emission Strength", emit_str)
@@ -87,14 +147,13 @@ def micro(mat, scale=520.0, amt=0.022):
     return mat
 
 
-PIEL = micro(pbr("M_Piel", (0.855, 0.660, 0.545), rough=0.44, sss=0.17,
-                 sss_col=(0.86, 0.42, 0.32), sss_rad=(0.030, 0.011, 0.0075)))
-PELO = pbr("M_Pelo", (0.105, 0.055, 0.033), rough=0.28, aniso=0.75, coat=0.40)
-ESCLERA = pbr("M_Esclera", (0.90, 0.885, 0.885), rough=0.13, sss=0.10,
-              sss_col=(0.85, 0.55, 0.50))
-IRIS = pbr("M_Iris", (0.115, 0.245, 0.185), rough=0.07, coat=0.9)
-PESTANA = pbr("M_Pestana", (0.040, 0.025, 0.022), rough=0.32)
-CEJA = pbr("M_Ceja", (0.105, 0.058, 0.038), rough=0.40)
+PIEL = toon("M_Piel", (0.925, 0.760, 0.650), calida=True, bandas=3, fuerza=0.70)
+PELO = toon("M_Pelo", (0.300, 0.150, 0.080), bandas=2, fuerza=0.55,
+            spec=0.42, aniso=True)
+ESCLERA = toon("M_Esclera", (0.97, 0.965, 0.975), bandas=2, fuerza=0.88)
+IRIS = toon("M_Iris", (0.150, 0.400, 0.320), bandas=2, fuerza=0.72, spec=0.9)
+PESTANA = toon("M_Pestana", (0.085, 0.050, 0.048), bandas=2, fuerza=0.85)
+CEJA = toon("M_Ceja", (0.260, 0.130, 0.070), bandas=2, fuerza=0.80)
 BRILLO = pbr("M_Brillo", (1, 1, 1), rough=0.05, emit=(1, 1, 1), emit_str=6.0)
 
 # Ojo con la textura del pack CC0: el iris viene pintado y mapeado a estas UV.
@@ -402,6 +461,89 @@ for v in _b.verts:
 _b.free()
 print(f"[AL] pelo: {len(hm.polygons)} caras, {_pz} pieza(s) "
       f"(objetivo medido: 3-5 piezas, ~1.500 tris)")
+
+# --------------------------------------------------- NORMALES ESFERIZADAS
+# El "blob face" (conocimiento/11): una cara cartoon no está esculpida como se
+# la va a iluminar, así que nariz, cejas y cuencas tiran sombras rotas que
+# delatan el 3D. La solución profesional es hacer que las normales de la cara
+# apunten como si fuese una esfera lisa: la cara pasa a sombrear como un volumen
+# limpio y la sombra queda de ilustración.
+grupo = ob.vertex_groups.new(name="CaraNormales")
+R_CAB = (CROWN_Z - CHIN_Z) * 0.5
+centro = Vector((0.0, HEAD_C.y + R_CAB * 0.30, (CROWN_Z + CHIN_Z) * 0.5))
+for v in ob.data.vertices:
+    p_ = v.co
+    if p_.z < CHIN_Z - 0.02 or p_.y > centro.y:
+        continue
+    # peso máximo en plena cara, desvaneciendo hacia sienes y mandíbula
+    dz = abs(p_.z - EYE_Z) / (R_CAB * 1.35)
+    dx = abs(p_.x) / (R_CAB * 1.15)
+    w_ = clamp01(1.0 - math.sqrt(dx * dx + dz * dz))
+    if w_ > 0.001:
+        grupo.add([v.index], w_ ** 0.7, 'REPLACE')
+
+esf = bpy.data.meshes.new("EsferaNormales")
+_ev, _ef = ico(4)
+esf.from_pydata([(x * R_CAB * 1.02 + centro.x, y * R_CAB * 1.02 + centro.y,
+                  z * R_CAB * 1.02 + centro.z) for (x, y, z) in _ev], [], _ef)
+esf.update()
+for poly in esf.polygons:
+    poly.use_smooth = True
+esfera = bpy.data.objects.new("EsferaNormales", esf)
+bpy.context.collection.objects.link(esfera)
+
+dt = ob.modifiers.new("EsferizarNormales", 'DATA_TRANSFER')
+dt.object = esfera
+dt.use_loop_data = True
+dt.data_types_loops = {'CUSTOM_NORMAL'}
+dt.loop_mapping = 'POLYINTERP_NEAREST'
+dt.vertex_group = "CaraNormales"
+bpy.ops.object.select_all(action='DESELECT')
+bpy.context.view_layer.objects.active = ob
+ob.select_set(True)
+try:
+    bpy.ops.object.modifier_apply(modifier=dt.name)
+    print("[AL] normales de la cara esferizadas")
+except Exception as e:
+    print("[AL] no se pudo esferizar:", e)
+bpy.data.objects.remove(esfera, do_unlink=True)
+
+# El cuerpo NO proyecta sombra sobre sí mismo: en este estilo la nariz no
+# mancha la mejilla. El pelo SÍ sigue proyectando sobre la cara, que es una
+# sombra deseable y característica.
+ob.visible_shadow = False
+
+# --------------------------------------------------- CONTORNO (casco invertido)
+# Material negro con Backface Culling + Solidify de grosor NEGATIVO y normales
+# invertidas: el casco crece hacia fuera y solo se ven sus caras traseras, que
+# aparecen como línea negra alrededor de la silueta (conocimiento/11).
+# El grosor va en unidades de MUNDO, así que se calibra a la escala del
+# personaje: 1,68 m -> ~1,2 mm.
+CONTORNO = bpy.data.materials.new("M_Contorno")
+CONTORNO.use_nodes = True
+_nt = CONTORNO.node_tree
+for _n in list(_nt.nodes):
+    _nt.nodes.remove(_n)
+_o = _nt.nodes.new("ShaderNodeOutputMaterial")
+_e = _nt.nodes.new("ShaderNodeEmission")
+_e.inputs["Color"].default_value = (0.02, 0.015, 0.02, 1.0)
+_nt.links.new(_e.outputs["Emission"], _o.inputs["Surface"])
+CONTORNO.use_backface_culling = True
+CONTORNO.diffuse_color = (0, 0, 0, 1)
+
+for _obj, _gr in ((ob, 0.0013), (PELO_OB, 0.0016), (OJOS, 0.0006)):
+    if _obj is None:
+        continue
+    _obj.data.materials.append(CONTORNO)
+    _idx = len(_obj.data.materials) - 1
+    _m = _obj.modifiers.new("Contorno", 'SOLIDIFY')
+    _m.thickness = -_gr
+    _m.offset = 1.0
+    _m.use_flip_normals = True
+    _m.use_rim = False
+    _m.material_offset = _idx
+    _m.material_offset_rim = _idx
+print("[AL] contorno de casco invertido aplicado")
 
 ob.game.physics_type = 'NO_COLLISION'
 bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
