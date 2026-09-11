@@ -32,6 +32,13 @@ La evolución de cada pieza, con imágenes, está en la **[bitácora](bitacora/)
 | Interior del Molino | la casa del panadero: horno de bóveda de 213 ladrillos |
 | Alonso Quijano | **en curso** — [base cambiada dos veces](bitacora/04-alonso.md) |
 
+## Conocimiento
+
+Antes de tocar geometría conviene pasar por la **[biblioteca de
+conocimiento](conocimiento/)**: proporciones de cabeza y cuerpo, anatomía del ojo
+cartoon, topología y construcción de pelo. Está ahí porque el cuello de botella
+del proyecto no era la herramienta, era el oficio.
+
 ## Cómo está construido
 
 Los `.blend` **no contienen Python**: ni text blocks, ni logic bricks, ni
