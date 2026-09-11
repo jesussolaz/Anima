@@ -547,6 +547,16 @@ def leaf_section(segs=8, w=1.0, h=0.32):
     return pts
 
 
+def clump_section(w=1.0, h=0.42):
+    """Sección de mechón anime: CUÑA DE ESQUINAS AFILADAS, no una lenteja.
+    Es el punto en el que insisten los tutoriales de pelo pincho: con sección
+    redonda el mechón lee como una manguera. Las aristas vivas —dos puntas
+    laterales y una cresta— son las que dan la faceta de pelo y las que el
+    cel-shading convierte en corte limpio entre luz y sombra."""
+    return [(-1.00 * w, 0.00), (-0.52 * w, 0.86 * h), (0.0, 1.15 * h),
+            (0.52 * w, 0.86 * h), (1.00 * w, 0.00), (0.0, -0.62 * h)]
+
+
 def hair_lock(path, w0=0.020, w1=0.002, thick=0.55, n=14, twist_amt=0.0,
               up_hint=(0, 1, 0), taper=2.6):
     """Mechón. `taper` alto = el mechón MANTIENE su grosor y solo se afila al

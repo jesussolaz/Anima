@@ -320,6 +320,87 @@ del cuero cabelludo en vez de por rayos radiales.
 Con `RASGOS = False` (por defecto) el paso 3 solo aplica materiales PBR y deja el
 cuerpo estilizado limpio, que es lo que hay ahora en `Alonso.blend`.
 
+## v9 — Ojos que miran y pelo con mechones (2026-09-12)
+
+Tres arreglos, y **dos de ellos eran fallos de verdad, no cuestión de gusto**.
+
+### El iris no cabía, y nadie lo recortaba
+
+El hueco del ojo mide 35,4 mm de alto; el iris medía 25,4. Quedaba **blanco por
+los cuatro lados**, que es exactamente la mirada de muñeco que la propia ficha
+`conocimiento/02` prohíbe. No se podía agrandar porque el ojo es una calcomanía
+plana y **nada lo recortaba**: un iris mayor se habría salido del ojo.
+
+La referencia dice que el iris anime ocupa **~70 % del ojo visible** y que su
+borde superior **se mete debajo del párpado**. Así que el recorte se hace
+analíticamente, contra la elipse de la abertura: cada punto del iris que se sale
+se empuja al borde. Ahora el iris mide 38 mm —más que el hueco— y el párpado se
+lo come por arriba. La pupila pasa del 30 % al 42 % del iris.
+
+### Los tintes de los ojos no se pintaban
+
+Al mirar por qué la pupila salía marrón en vez de negra apareció un fallo
+silencioso: **`toon()` nunca leía el atributo `Col`** que escribe `Build.add`.
+Todos los `tint=` se perdían. El ojo entero tenía **dos colores** —verde y el
+marrón de la ceja— en lugar de anillo limbal, cuerpo, realce y pupila.
+
+Se cableó el atributo multiplicando la rampa (no sustituyéndola, para no perder
+las bandas del cel). Es **opt-in**: un objeto sin esa capa devolvería negro, y la
+malla del cuerpo no la tiene.
+
+| | v8 | v9 |
+|---|---|---|
+| | ![v8](img/alonso-v8-cara.jpg) | ![v9](img/alonso-v9-cara.jpg) |
+
+### El pelo era una bolsa de plástico
+
+Dicho por el propietario del proyecto, y con razón. Era **una sola cáscara**
+ajustada al cráneo: por mucho que se le module el borde, una cáscara no tiene
+volumen propio.
+
+La corrección salió de transcribir un tutorial de pelo pincho y está entera en
+`conocimiento/05-pelo.md`. Lo esencial: **un mechón es un barrido sobre una curva
+con sección de esquinas afiladas**, grueso en la raíz y afilado en la punta, y el
+peinado se monta con muchos colocados a mano — *"lo único que hay es variación de
+tamaño y escala"*.
+
+Y **una lección anterior estaba mal escrita**. Cuando 73 conos sueltos fallaron,
+se concluyó que las púas debían ser una superficie continua. Lo que falló fue la
+**forma** de los conos (agujas) y que **no había masa debajo**; el número de
+piezas era una correlación, no la causa. La estructura buena lleva las dos cosas:
+lámina continua que tapa el cuero cabelludo y proyecta **una** sombra sólida en
+la frente, y **25 mechones encima** que dan volumen y silueta.
+
+Lo que costó calibrar fue `salida`, cuánto se despega cada mechón: **en la
+coronilla la normal del cráneo apunta hacia arriba**, así que a 1,0 salían astas
+de ciervo y a 0,06 volvía la cúpula lisa. A 0,17, yendo hacia atrás y con la raíz
+escalonada, se ve el canto de cada lámina sin romper el perfil.
+
+| 3/4 | Silueta |
+|---|---|
+| ![3/4](img/alonso-v9-34.jpg) | ![silueta](img/alonso-v9-silueta.jpg) |
+
+### Proporciones
+
+Los planos laterales de la cara habían estrechado la cabeza (0,932 → 0,887).
+Se compensó en el término X del escalado de cabeza, no ensanchando más el plano,
+que ya se había probado y solo daba 0,891.
+
+```
+CABEZAS DE ALTO     6.31   (objetivo 6,5)
+LINEA DE OJOS       44.0%  (objetivo 40-46%)
+CRANEO              56.0%  (objetivo 54-60%)
+ANCHO/ALTO CABEZA   0.931  (referencias CC0 ~0,94)
+```
+
+### Lo que sigue sin estar bien
+
+- Los mechones laterales cuelgan como cuchillas planas junto a las orejas.
+- La boca es una raya ancha y seria, y la mandíbula pesa: lee mayor de 16.
+- El cuello mide el 64 % del ancho de cabeza. Falta **medir una referencia CC0**
+  antes de tocarlo: estimar a ojo es justo lo que no funciona.
+- Sigue desnudo. La ropa es lo de mayor impacto que queda.
+
 ## Siguiente
 
 1. Rehacer el ajuste de ojos y pelo por proyección, no por rayos.

@@ -166,7 +166,7 @@ def style_delta(p):
         d = p - NECKJ
         # el estilizado de referencia tiene la cabeza ANCHA: ancho/alto 0,95,
         # frente al 0,83 que tenía Alonso. Se ensancha en X más que en Z.
-        delta_i += Vector((d.x * 1.58, d.y * 1.05, d.z * 0.92)) * ((HEAD_SCALE - 1.0) * w)
+        delta_i += Vector((d.x * 1.78, d.y * 1.05, d.z * 0.92)) * ((HEAD_SCALE - 1.0) * w)
 
     # OJOS. Campo ceñido al ojo, y crece mucho más en vertical que en horizontal:
     # un ojo JRPG no es un ojo realista escalado, es un ojo ABIERTO, que se come
@@ -217,6 +217,42 @@ def style_delta(p):
                                                 0.085, 0.075, 0.090)))
         delta_i.y += (-0.128 - p.y) * 0.30 * fw
 
+    # PLANOS LATERALES DE LA CABEZA (conocimiento/08). Un plano PLANO tallado en
+    # la esfera, del temporal al pómulo. Sin él el cráneo es una esfera con
+    # rasgos encima, que es exactamente lo que tenía Alonso.
+    if p.z > CHIN_Z - 0.01:
+        alto = clamp01((p.z - (CHIN_Z - 0.01)) / max(CROWN_Z - CHIN_Z, 1e-6))
+        # el plano existe entre mandíbula y sien, no en la coronilla
+        franja = smoothstep(0.04, 0.22, alto) * (1.0 - smoothstep(0.72, 0.95, alto))
+        # y se aplana hacia atrás; la cara de delante se deja
+        atras = smoothstep(-0.055, 0.015, p.y)
+        w_lat = franja * atras
+        if w_lat > 0.002 and abs(p.x) > 0.018:
+            ancho_plano = 0.0815 * (1.0 - 0.11 * abs(alto - 0.42))
+            objetivo = ancho_plano * (1 if p.x > 0 else -1)
+            delta_i.x += (objetivo - p.x) * 0.78 * w_lat
+
+    # NARIZ DE PICO (conocimiento/14). "Recuerda más al pico de un pájaro que a
+    # una nariz." La cara anime en 3D es PUNTIAGUDA a propósito: el cel-shading
+    # esconde la forma rara. Suavizarla para que resulte creíble es el error.
+    # cresta estrecha y alta desde el puente hasta la punta
+    d = p - Vector((0.0, NOSE_TIP.y + 0.016, NOSE_TIP.z + 0.016))
+    w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.0090, 0.026, 0.034)))
+    if w > 0.002:
+        delta_i.y -= 0.0105 * w ** 1.3
+        delta_i.x -= p.x * 0.55 * w
+    # y la punta, que es lo que sobresale de verdad
+    d = p - Vector((0.0, NOSE_TIP.y + 0.006, NOSE_TIP.z - 0.002))
+    w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.0075, 0.016, 0.013)))
+    delta_i.y -= 0.0090 * w ** 1.2
+
+    # mentón también en punta, no redondo
+    d = p - Vector((0.0, JAWJ.y - 0.010, CHIN_Z + 0.008))
+    w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.030, 0.034, 0.026)))
+    if w > 0.002:
+        delta_i.y -= 0.0050 * w ** 1.5
+        delta_i.x -= p.x * 0.22 * w
+
     # cráneo más lleno arriba y frente algo mayor
     d = p - Vector((0.0, -0.015, CROWN_Z - 0.055))
     w = smoothstep(1.0, 0.0, clamp01(ellip(d, 0.100, 0.110, 0.080)))
@@ -262,8 +298,11 @@ if moved:
     bm.verts.ensure_lookup_table()
     frozen = {v.index for v in bm.verts if v.is_boundary}
     target = [bm.verts[i] for i in moved if i not in frozen]
+    # La relajación es necesaria: sin ella los pliegues que deja el
+    # desplazamiento por campos se ven como BULTOS. "Puntiagudo" debe salir de
+    # un cambio de plano deliberado y fuerte, no de dejar de suavizar.
     for _ in range(3):
-        bmesh.ops.smooth_vert(bm, verts=target, factor=0.55,
+        bmesh.ops.smooth_vert(bm, verts=target, factor=0.50,
                               use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bm.to_mesh(me)
     bm.free()

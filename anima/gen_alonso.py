@@ -20,7 +20,8 @@ from mathutils.bvhtree import BVHTree
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.modules.pop("anima_kit", None)
 from anima_kit import (                                            # noqa: E402
-    Build, catmull, clamp01, hair_lock, ico, lerp, loft, smoothstep)
+    Build, catmull, clamp01, clump_section, hair_lock, ico, lerp, loft,
+    smoothstep, sweep)
 
 random.seed(1605)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -38,6 +39,8 @@ me = ob.data
 EYE_Z = ob["ALONSO_EYE_Z"]
 CROWN_Z = ob["ALONSO_CROWN_Z"]
 HEIGHT = ob["ALONSO_HEIGHT"]
+# Centro del cráneo: desde aquí se mide la latitud de la banda de brillo.
+CENTRO_CRANEO = (0.0, 0.0, EYE_Z + 0.34 * (CROWN_Z - EYE_Z))
 
 
 def sombra_de(color, calida=False, fuerza=0.62):
@@ -55,7 +58,8 @@ def sombra_de(color, calida=False, fuerza=0.62):
 
 
 def toon(name, color, calida=False, bandas=2, fuerza=0.62, spec=0.0,
-         aniso=False):
+         aniso=False, usa_col=False, umbral=0.62, spec_col=None,
+         banda_z=None):
     """Cel shader de EEVEE: Diffuse BSDF -> Shader to RGB -> Color Ramp en
     CONSTANT. Sin esto los personajes salen como figuras de plástico
     fotografiadas: el PBR realista no sirve para este estilo."""
@@ -84,6 +88,23 @@ def toon(name, color, calida=False, bandas=2, fuerza=0.62, spec=0.0,
     nt.links.new(s2r.outputs["Color"], ramp.inputs["Fac"])
     salida = ramp.outputs["Color"]
 
+    if usa_col:
+        # El atributo "Col" que escribe Build.add NO se leía: todos los tint=
+        # se perdían en silencio, y por eso el iris solo tenía dos colores
+        # (verde y el marrón de la ceja) en vez de anillo limbal, cuerpo,
+        # realce y pupila. Va MULTIPLICANDO la rampa, no sustituyéndola, para
+        # no perder las bandas del cel. Es opt-in porque un objeto sin la capa
+        # devolvería negro, y la malla del cuerpo no la tiene.
+        vc = nt.nodes.new("ShaderNodeVertexColor")
+        vc.layer_name = "Col"
+        mul = nt.nodes.new("ShaderNodeMix")
+        mul.data_type = 'RGBA'
+        mul.blend_type = 'MULTIPLY'
+        mul.inputs["Factor"].default_value = 1.0
+        nt.links.new(salida, mul.inputs["A"])
+        nt.links.new(vc.outputs["Color"], mul.inputs["B"])
+        salida = mul.outputs["Result"]
+
     if spec > 0.0:
         # brillo: en el pelo es una BANDA que recorre la cabeza, no un punto
         gl = nt.nodes.new("ShaderNodeBsdfGlossy")
@@ -95,8 +116,15 @@ def toon(name, color, calida=False, bandas=2, fuerza=0.62, spec=0.0,
         gramp.color_ramp.interpolation = 'CONSTANT'
         gramp.color_ramp.elements[0].position = 0.0
         gramp.color_ramp.elements[0].color = (0, 0, 0, 1)
-        gramp.color_ramp.elements[1].position = 0.62
-        gramp.color_ramp.elements[1].color = (spec, spec, spec, 1.0)
+        # El umbral decide el GROSOR de la banda. A 0,62 con el glossy ancho
+        # del pelo la banda se comía media cabeza y, siendo un ADD gris sobre
+        # castaño oscuro, salía blanco rosáceo: leía como calvas, no como brillo.
+        gramp.color_ramp.elements[1].position = umbral
+        # el brillo del pelo es el propio color aclarado, no gris: un ADD gris
+        # desatura y rompe la gama
+        sc_ = spec_col if spec_col is not None else (1.0, 1.0, 1.0)
+        gramp.color_ramp.elements[1].color = (sc_[0] * spec, sc_[1] * spec,
+                                              sc_[2] * spec, 1.0)
         add = nt.nodes.new("ShaderNodeMix")
         add.data_type = 'RGBA'
         add.blend_type = 'ADD'
@@ -106,6 +134,60 @@ def toon(name, color, calida=False, bandas=2, fuerza=0.62, spec=0.0,
         nt.links.new(salida, add.inputs["A"])
         nt.links.new(gramp.outputs["Color"], add.inputs["B"])
         salida = add.outputs["Result"]
+
+    if banda_z is not None:
+        # BRILLO DEL PELO. No es un reflejo: en anime es un elemento de DISEÑO,
+        # una banda a una ALTURA FIJA de la cabeza que no se mueve con la luz.
+        # Con un glossy salían tres manchas sueltas siguiendo los huecos entre
+        # mechones —leían como calvas— y subir el umbral casi no las estrechó,
+        # porque el lóbulo satura sobre una superficie tan ancha.
+        # Va por LATITUD alrededor del centro del cráneo, no por altura: una
+        # banda de Z plana corta la cabeza en línea recta y lee como una cinta.
+        # Tomando la dirección desde el centro y midiendo su componente Z sale
+        # un paralelo de esfera, que de frente arquea hacia abajo por los lados
+        # —que es como se dibuja.
+        centro, lat, grosor, bcol = banda_z
+        geo = nt.nodes.new("ShaderNodeNewGeometry")
+        res = nt.nodes.new("ShaderNodeVectorMath"); res.operation = 'SUBTRACT'
+        res.inputs[1].default_value = centro
+        nt.links.new(geo.outputs["Position"], res.inputs[0])
+        nor = nt.nodes.new("ShaderNodeVectorMath"); nor.operation = 'NORMALIZE'
+        nt.links.new(res.outputs["Vector"], nor.inputs[0])
+        sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+        nt.links.new(nor.outputs["Vector"], sep.inputs["Vector"])
+        mr = nt.nodes.new("ShaderNodeMapRange")
+        mr.inputs["From Min"].default_value = lat - 0.50
+        mr.inputs["From Max"].default_value = lat + 0.50
+        nt.links.new(sep.outputs["Z"], mr.inputs["Value"])
+        br = nt.nodes.new("ShaderNodeValToRGB")
+        br.color_ramp.interpolation = 'CONSTANT'
+        br.color_ramp.elements[0].position = 0.0
+        br.color_ramp.elements[0].color = (0, 0, 0, 1)
+        br.color_ramp.elements[1].position = 0.5 - grosor
+        br.color_ramp.elements[1].color = (*bcol, 1.0)
+        e2 = br.color_ramp.elements.new(0.5 + grosor)
+        e2.color = (0, 0, 0, 1)
+        nt.links.new(mr.outputs["Result"], br.inputs["Fac"])
+        # se apaga en la zona en sombra: una banda que brilla en el lado oscuro
+        # delata que es un truco
+        puerta = nt.nodes.new("ShaderNodeValToRGB")
+        puerta.color_ramp.interpolation = 'CONSTANT'
+        puerta.color_ramp.elements[0].position = 0.0
+        puerta.color_ramp.elements[0].color = (0.12, 0.12, 0.12, 1)
+        puerta.color_ramp.elements[1].position = 0.50
+        puerta.color_ramp.elements[1].color = (1, 1, 1, 1)
+        nt.links.new(s2r.outputs["Color"], puerta.inputs["Fac"])
+        gate = nt.nodes.new("ShaderNodeMix")
+        gate.data_type = 'RGBA'; gate.blend_type = 'MULTIPLY'
+        gate.inputs["Factor"].default_value = 1.0
+        nt.links.new(br.outputs["Color"], gate.inputs["A"])
+        nt.links.new(puerta.outputs["Color"], gate.inputs["B"])
+        sumb = nt.nodes.new("ShaderNodeMix")
+        sumb.data_type = 'RGBA'; sumb.blend_type = 'ADD'
+        sumb.inputs["Factor"].default_value = 1.0
+        nt.links.new(salida, sumb.inputs["A"])
+        nt.links.new(gate.outputs["Result"], sumb.inputs["B"])
+        salida = sumb.outputs["Result"]
 
     nt.links.new(salida, emi.inputs["Color"])
     nt.links.new(emi.outputs["Emission"], out.inputs["Surface"])
@@ -149,11 +231,15 @@ def micro(mat, scale=520.0, amt=0.022):
 
 PIEL = toon("M_Piel", (0.925, 0.760, 0.650), calida=True, bandas=3, fuerza=0.70)
 PELO = toon("M_Pelo", (0.300, 0.150, 0.080), bandas=2, fuerza=0.55,
-            spec=0.42, aniso=True)
-ESCLERA = toon("M_Esclera", (0.97, 0.965, 0.975), bandas=2, fuerza=0.88)
-IRIS = toon("M_Iris", (0.150, 0.400, 0.320), bandas=2, fuerza=0.72, spec=0.9)
+            spec=0.0,
+            banda_z=(CENTRO_CRANEO, 0.60, 0.055, (0.30, 0.20, 0.12)))
+ESCLERA = toon("M_Esclera", (0.97, 0.965, 0.975), bandas=2, fuerza=0.88,
+               usa_col=True)
+IRIS = toon("M_Iris", (0.150, 0.400, 0.320), bandas=2, fuerza=0.72, spec=0.9,
+            usa_col=True)
 PESTANA = toon("M_Pestana", (0.085, 0.050, 0.048), bandas=2, fuerza=0.85)
-CEJA = toon("M_Ceja", (0.260, 0.130, 0.070), bandas=2, fuerza=0.80)
+CEJA = toon("M_Ceja", (0.260, 0.130, 0.070), bandas=2, fuerza=0.80,
+            usa_col=True)
 BRILLO = pbr("M_Brillo", (1, 1, 1), rough=0.05, emit=(1, 1, 1), emit_str=6.0)
 
 # Ojo con la textura del pack CC0: el iris viene pintado y mapeado a estas UV.
@@ -260,23 +346,39 @@ def build_eye(ctr, side):
     V, F = loft(rings, cap_start=False, cap_end=True)
     EYES.add(V, F, 0, smooth=True)
 
-    # iris grande, anillo limbal, pupila y dos brillos
-    # El iris toca el párpado superior y se mete debajo (conocimiento/02).
-    # Flotando con blanco alrededor lee como sorpresa o como muñeco.
-    IR = 0.0122
-    IZ = 0.0026                       # se sube: tapado arriba, esclerótica abajo
-    for (s0, s1, mat, tint) in ((1.00, 0.90, 1, (0.16, 0.18, 0.22)),
-                                (0.90, 0.46, 1, (1.00, 1.06, 1.00)),
-                                (0.46, 0.30, 1, (1.85, 2.00, 1.80)),
-                                (0.30, 0.06, 3, (0.10, 0.10, 0.12))):
-        r0 = [(x, y, z + IZ) for (x, y, z) in
-              ell(IR * s0, IR * s0 * 1.04, 0.0050 + 0.0012 * (1 - s0), 30)]
-        r1 = [(x, y, z + IZ) for (x, y, z) in
-              ell(IR * s1, IR * s1 * 1.04, 0.0050 + 0.0012 * (1 - s1), 30)]
-        V, F = loft([r0, r1], cap_start=False, cap_end=True)
+    # El iris anime es MÁS GRANDE que el hueco del ojo y el párpado se lo come
+    # por arriba: ocupa ~70 % del ojo visible y su borde superior se mete
+    # debajo del párpado. Antes el iris medía 25 mm en un hueco de 35 y dejaba
+    # blanco por los CUATRO lados: eso es la mirada de muñeco que prohíbe
+    # conocimiento/02. No se podía agrandar porque nada lo recortaba, así que
+    # el recorte se hace aquí, contra la elipse de la abertura.
+    IR = 0.0190
+    IZ = 0.0030                       # sube: comido arriba, filo de blanco abajo
+
+    def recorta(x, z, k=1.0):
+        """Empuja el punto al borde de la abertura si se sale de ella."""
+        u, v = (x - ctr.x) / EW, (z - ctr.z) / EH
+        r = math.hypot(u, v)
+        if r <= k:
+            return x, z
+        return ctr.x + u / r * k * EW, ctr.z + v / r * k * EH
+
+    # cada anillo se recorta un pelo más adentro que el anterior: si dos caen
+    # justo en el mismo borde salen caras de área cero y el sombreado se pica
+    for (s0, s1, mat, tint) in ((1.00, 0.88, 1, (0.16, 0.18, 0.22)),
+                                (0.88, 0.52, 1, (1.00, 1.06, 1.00)),
+                                (0.52, 0.42, 1, (1.85, 2.00, 1.80)),
+                                (0.42, 0.08, 3, (0.10, 0.10, 0.12))):
+        anillo = []
+        for (s, k) in ((s0, 1.000), (s1, 0.994)):
+            pts = ell(IR * s, IR * s * 1.04, 0.0050 + 0.0012 * (1 - s), 30)
+            anillo.append([(lambda cx, cz: (cx, y, cz))(*recorta(x, z + IZ, k))
+                           for (x, y, z) in pts])
+        V, F = loft(anillo, cap_start=False, cap_end=True)
         EYES.add(V, F, mat, smooth=True, tint=tint)
-    for (hx, hz, hr, hi) in ((-0.0048, 0.0072, 0.0034, 14.0),
-                             (0.0052, -0.0026, 0.0017, 4.0)):
+    # los brillos crecen con el iris, o se pierden dentro de él
+    for (hx, hz, hr, hi) in ((-0.0064, 0.0094, 0.0047, 14.0),
+                             (0.0072, -0.0040, 0.0024, 4.0)):
         hv, hf = ico(2)
         EYES.add([(x * hr + ctr.x + hx * side, y * hr * 0.4 + fy - 0.0064,
                    z * hr + ctr.z + hz) for (x, y, z) in hv], hf, 0,
@@ -331,7 +433,7 @@ print(f"[AL] ojos planos (calcomanía): {len(OJOS.data.polygons)} caras")
 # contorno de esa superficie, que es exactamente lo que se juzga en la prueba.
 
 NA_H = 40                      # azimuts
-N_SCALP, N_FREE = 5, 6         # anillos pegados al cráneo + anillos libres
+N_SCALP, N_FREE = 5, 4         # anillos pegados al cráneo + anillos libres
 N_PICOS = 9                    # puntas alrededor de la silueta
 
 HAIRLINE = [(0.00, math.radians(48)), (0.60, math.radians(43)),
@@ -391,45 +493,155 @@ bpy.ops.object.modifier_apply(modifier=sw.name)
 scalp = [v.co.copy() for v in tm.vertices]
 bpy.data.objects.remove(cap, do_unlink=True)
 
-# --- una sola superficie: casquete + fleco de puntas ---------------------------
+# --- casquete: la MASA, que ya NO define la silueta ---------------------------
+# El pelo anterior era ESTA superficie y nada más, y por eso leía como una bolsa
+# marrón estirada: una cáscara pegada al cráneo no tiene volumen propio por
+# mucho que se le module el borde. El método de los tutoriales de pelo pincho es
+# otro: una masa que tapa el cuero cabelludo y, ENCIMA, mechones colocados uno a
+# uno. Lo dicen con estas palabras: "lo único que hay es variación de tamaño y
+# escala", y se hacen a mano en vez de con partículas porque así se controlan.
+#
+# El intento de 73 conos sueltos falló por la FORMA de los conos (agujas) y por
+# no haber masa debajo, no por usar mechones. El recuento de piezas era la
+# lección equivocada.
 HV, HF = [], []
+
+
+def anade(V, F):
+    base = len(HV)
+    HV.extend(tuple(v) for v in V)
+    HF.extend([[i + base for i in f] for f in F])
+
+
+CAP = []
 for j in range(N_SCALP):
+    fila = []
     for i in range(NA_H):
         a = i / NA_H * 2 * math.pi
-        p = scalp[j * NA_H + i]
-        n = (p - HEAD_C)
-        n.z *= 0.72
-        n.normalize()
+        q = scalp[j * NA_H + i]
+        nn = (q - HEAD_C)
+        nn.z *= 0.72
+        nn.normalize()
         t = j / (N_SCALP - 1)
-        # volumen: crece del cuero cabelludo hacia el borde, con relieve de mechón
-        vol = (0.006 + 0.042 * esponja(a) * math.sin(t * math.pi * 0.70) ** 0.7
-               + 0.016 * pico(a) * t)
-        HV.append(tuple(p + n * vol))
+        vol = 0.008 + 0.030 * esponja(a) * math.sin(t * math.pi * 0.70) ** 0.7
+        fila.append(q + nn * vol)
+    CAP.append(fila)
 
-borde = [Vector(HV[(N_SCALP - 1) * NA_H + i]) for i in range(NA_H)]
+# Lámina de flequillo: continua, con el borde recortado en puntas. Va DETRÁS de
+# los mechones y hace dos cosas que ellos no pueden: tapa el cuero cabelludo y
+# proyecta UNA sombra sólida sobre la frente. Con mechones sueltos y nada detrás,
+# la luz se colaba por los huecos y rayaba la cara a franjas.
+FREE = []
+borde = CAP[-1]
 for j in range(1, N_FREE + 1):
     t = j / N_FREE
+    fila = []
     for i in range(NA_H):
         a = i / NA_H * 2 * math.pi
         base = borde[i]
-        n = (base - HEAD_C)
-        n.z *= 0.72
-        n.normalize()
-        # la punta baja, se despega y se afila; su largo lo marca `pico`
-        frente = clamp01(math.cos(a) * 0.5 + 0.5)      # 1 justo en la frente
-        largo = ((0.026 + 0.072 * pico(a)) * esponja(a)
-                 + 0.024 * frente ** 1.9)                  # flequillo: muere SOBRE la ceja
-        caida = Vector((n.x * 0.38, n.y * 0.38, -0.94)).normalized()
-        p = base + caida * (largo * t) + n * (largo * 0.30 * t * (1 - t))
-        HV.append(tuple(p))
+        nn = (base - HEAD_C)
+        nn.z *= 0.72
+        nn.normalize()
+        frente = clamp01(math.cos(a) * 0.5 + 0.5)
+        largo = (((0.026 + 0.072 * pico(a)) * esponja(a)
+                  + 0.024 * frente ** 1.9) * 0.62)
+        caida = Vector((nn.x * 0.38, nn.y * 0.38, -0.94)).normalized()
+        fila.append(base + caida * (largo * t)
+                    + nn * (largo * 0.30 * t * (1 - t)))
+    FREE.append(fila)
 
-filas = N_SCALP + N_FREE
-for j in range(filas - 1):
+FILAS = CAP + FREE
+for fila in FILAS:
+    HV.extend(tuple(v) for v in fila)
+for j in range(len(FILAS) - 1):
     for i in range(NA_H):
         i2 = (i + 1) % NA_H
         HF.append([j * NA_H + i, j * NA_H + i2,
                    (j + 1) * NA_H + i2, (j + 1) * NA_H + i])
 HF.append(list(range(NA_H))[::-1])                     # tapa de la coronilla
+
+
+def cap_pt(a, t):
+    """Punto y normal sobre el casquete: de ahí arranca cada mechón."""
+    fi = (a % (2 * math.pi)) / (2 * math.pi) * NA_H
+    i0 = int(math.floor(fi)) % NA_H
+    i1 = (i0 + 1) % NA_H
+    fx = fi - math.floor(fi)
+    fj = clamp01(t) * (N_SCALP - 1)
+    j0 = min(int(fj), N_SCALP - 1)
+    j1 = min(j0 + 1, N_SCALP - 1)
+    fy = fj - j0
+    q = (CAP[j0][i0].lerp(CAP[j0][i1], fx)).lerp(
+        CAP[j1][i0].lerp(CAP[j1][i1], fx), fy)
+    nn = (q - HEAD_C)
+    nn.z *= 0.72
+    nn.normalize()
+    return q, nn
+
+
+def mechon(a, t, largo, ancho, salida, flujo, twist=0.0, n_seg=11,
+           taper=3.0, grosor=0.32):
+    """Un mechón: raíz gruesa sobre la masa, se DESPEGA del cráneo y muere en
+    punta. `salida` es cuánto se separa; sin eso vuelve a ser chapa pegada.
+    `taper` alto mantiene el grosor y afila solo al final: bajo da una aguja."""
+    raiz, nor = cap_pt(a, t)
+    f = Vector(flujo)
+    f.normalize()
+    P = catmull([raiz,
+                 raiz + nor * (salida * largo * 0.55) + f * (largo * 0.18),
+                 raiz + nor * (salida * largo * 0.62) + f * (largo * 0.60),
+                 raiz + nor * (salida * largo * 0.20) + f * largo], n_seg)
+    lado = nor.cross(f)
+    if lado.length < 1e-6:
+        lado = Vector((1.0, 0.0, 0.0))
+    lado.normalize()
+    escalas = [lerp(ancho, ancho * 0.02, (i / (n_seg - 1)) ** taper)
+               for i in range(n_seg)]
+    giros = [twist * (i / (n_seg - 1)) for i in range(n_seg)]
+    return sweep(P, clump_section(1.0, grosor), escalas, giros, caps=True,
+                 up_hint=tuple(lado))
+
+
+# a=0 es el frente (la cara mira a -Y), a=pi la nuca, a>0 el lado izquierdo.
+# Tres tamaños mezclados: es la variación, no el número, lo que da el peinado.
+MECHONES = []
+for k, a in enumerate((-0.92, -0.62, -0.33, -0.05, 0.24, 0.55, 0.88)):
+    # FLEQUILLO: cae hacia la frente y muere sobre la ceja. Los de en medio
+    # bajan más y se cruzan un poco, que es lo que evita el flequillo de cuenco.
+    cen = 1.0 - abs(a) / 0.95
+    MECHONES.append(dict(
+        a=a, t=0.99, largo=0.070 + 0.030 * cen,
+        ancho=0.0135 + 0.0075 * cen, salida=0.26,
+        flujo=(0.30 * math.sin(a * 1.7) - 0.10 * a, -0.60, -0.86 + 0.18 * cen),
+        twist=(-0.45 if k % 2 else 0.45)))
+for a, lg, an, tr in ((0.10, 0.132, 0.032, 0.06),
+                      (-0.78, 0.096, 0.025, 0.20),
+                      (0.92, 0.118, 0.029, 0.11),
+                      (-1.64, 0.108, 0.022, 0.26),
+                      (1.55, 0.086, 0.027, 0.17),
+                      (math.pi - 0.2, 0.122, 0.030, 0.08)):
+    # CORONILLA: los picos grandes. Suben y barren hacia atrás; son los que
+    # dan el perfil de punta y sacan al pelo del cráneo.
+    MECHONES.append(dict(a=a, t=tr, largo=lg, ancho=an, salida=0.17,
+                         flujo=(0.24 * math.sin(a), 0.96, -0.14), twist=0.30,
+                         grosor=0.27))
+for lado in (1, -1):
+    for a0, lg, an in ((1.42, 0.074, 0.015), (1.92, 0.086, 0.017),
+                       (2.38, 0.070, 0.014)):
+        # LATERALES: barren hacia atrás por encima de la oreja
+        MECHONES.append(dict(a=a0 * lado, t=0.97, largo=lg, ancho=an,
+                             salida=0.10, grosor=0.24,
+                             flujo=(0.10 * lado, 0.80, -0.60), twist=0.25 * lado))
+for a, lg, an in ((math.pi - 0.38, 0.080, 0.017), (math.pi + 0.38, 0.080, 0.017),
+                  (math.pi - 0.82, 0.068, 0.015), (math.pi + 0.82, 0.068, 0.015),
+                  (math.pi, 0.090, 0.019)):
+    # NUCA: caen y se levantan en la punta
+    MECHONES.append(dict(a=a, t=0.97, largo=lg, ancho=an, salida=0.26,
+                         flujo=(0.10 * math.sin(a), 0.52, -0.85), twist=-0.20))
+
+for m in MECHONES:
+    anade(*mechon(**m))
+print(f"[AL] pelo: casquete + {len(MECHONES)} mechones")
 
 hm = bpy.data.meshes.new("Alonso_Pelo")
 hm.from_pydata(HV, [], HF)
