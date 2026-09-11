@@ -35,7 +35,10 @@ IN_BLEND = os.path.join(HERE, "AlonsoBase.blend")
 OUT_BLEND = os.path.join(HERE, "AlonsoEstilo.blend")
 
 # --- cuánto se estiliza -------------------------------------------------------
-HEAD_SCALE = 1.155      # cabeza algo mayor: lectura juvenil, no chibi
+HEAD_SCALE = 1.340      # 6,5 cabezas = adolescente (conocimiento/04).
+                        # A 8 cabezas lee ADULTO por mucha cara de niño
+                        # que se le ponga, y esa contradicción es lo que
+                        # hacía que el modelo no terminara de funcionar.
 EYE_WIDE = 1.58         # el ojo se ensancha...
 EYE_TALL = 2.85         # ...y sobre todo SE ABRE: eso es lo que lo hace JRPG
 NOSE_SHRINK = 0.32      # nariz pequeña, casi insinuada
@@ -98,6 +101,15 @@ JAWJ = group_centroid("joint-jaw")
 MOUTHJ = group_centroid("joint-mouth")
 assert L_EYE and R_EYE and NECKJ and JAWJ, "faltan referencias en la malla base"
 
+# OJO: estas referencias hay que tomarlas AQUÍ, antes de podar. La poda borra la
+# geometría de los grupos `joint-*`, y group_centroid devolvería None en silencio
+# — el ensanche de hombros y el agrandado de manos llevaban tiempo sin hacer nada.
+CLAV_L = group_centroid("joint-l-clavicle") or group_centroid("joint-l-shoulder")
+WRIST_L = group_centroid("joint-l-wrist")
+WRIST_R = group_centroid("joint-r-wrist")
+print(f"[EST] hombro {tuple(round(c,3) for c in CLAV_L) if CLAV_L else None} | "
+      f"muñeca {tuple(round(c,3) for c in WRIST_L) if WRIST_L else None}")
+
 CROWN_Z = max(v.co.z for v in me.vertices)
 EYE_Z0 = L_EYE.z
 # punta de la nariz: el vértice más adelantado entre boca y ojos, en el eje
@@ -138,8 +150,6 @@ print(f"[EST] auxiliares borrados: {len(kill)} -> {len(me.vertices)} verts")
 # --- 5: deformación de estilo ------------------------------------------------
 orig = [v.co.copy() for v in me.vertices]
 delta = [Vector((0, 0, 0)) for _ in orig]
-WRIST_L = group_centroid("joint-l-wrist")
-WRIST_R = group_centroid("joint-r-wrist")
 
 
 def ellip(d, rx, ry, rz):
@@ -154,7 +164,7 @@ def style_delta(p):
         # en Z se escala menos: escalar uniforme desde el cuello alarga la cabeza
         # y sale un huevo en vez de una cabeza juvenil (ancha, no larga)
         d = p - NECKJ
-        delta_i += Vector((d.x, d.y, d.z * 0.55)) * ((HEAD_SCALE - 1.0) * w)
+        delta_i += Vector((d.x, d.y, d.z * 0.92)) * ((HEAD_SCALE - 1.0) * w)
 
     # OJOS. Campo ceñido al ojo, y crece mucho más en vertical que en horizontal:
     # un ojo JRPG no es un ojo realista escalado, es un ojo ABIERTO, que se come
@@ -211,6 +221,15 @@ def style_delta(p):
     if w > 0.002:
         delta_i += Vector((p.x, p.y + 0.015, 0.0)) * (0.016 * w)
 
+    # Torso en V (conocimiento/04). Con la cabeza a proporción de adolescente,
+    # unos hombros estrechos hacen que el conjunto lea como niño: hay que
+    # compensar ensanchando hombros y estrechando cintura.
+    if CLAV_L is not None:
+        wsh = smoothstep(1.0, 0.0, clamp01(abs(p.z - CLAV_L.z) / 0.105))
+        delta_i.x += p.x * 0.150 * wsh
+        wci = smoothstep(1.0, 0.0, clamp01(abs(p.z - (CLAV_L.z - 0.235)) / 0.085))
+        delta_i.x -= p.x * 0.045 * wci
+
     # manos algo mayores
     for WJ in (WRIST_L, WRIST_R):
         if WJ is None:
@@ -247,6 +266,78 @@ if moved:
     me.update()
     print(f"[EST] relajados {len(target)} verts ({len(frozen)} de borde intactos)")
 
+# --- 5c: REMAPEO VERTICAL DE LA CABEZA ----------------------------------------
+# La regla del estilo (conocimiento/01 y 06): la línea de ojos va al 40-46 % del
+# alto de cabeza desde el mentón. Alonso estaba al 55 %, por encima incluso del
+# 50 % realista. Consecuencia: bóveda craneal pequeña y cara que lee adulta por
+# mucho que se agranden los ojos.
+#
+# Se comprime lo que hay bajo los ojos y se expande lo que hay encima, dejando
+# mentón y coronilla donde estaban. Eso baja la línea de ojos Y comprime el
+# tercio inferior, que son las dos correcciones de mayor impacto.
+EYE_RATIO = 0.415
+
+
+def medir_menton(verts, eye):
+    """Mentón = donde el ANCHO DE CARA toca su mínimo por debajo de los ojos.
+
+    Bajando desde los ojos la cara se estrecha hasta el mentón; a partir de ahí
+    el cuello vuelve a ensanchar. Ese mínimo es el mentón, y es un detector
+    estable. Se probaron tres heurísticas de perfil frontal ("primer salto hacia
+    delante", "último", "lo que sobresale del cuello") y cada una daba un
+    resultado distinto según dónde arrancara el escaneo. El grupo anatómico
+    `joint-jaw` tampoco vale: está 2 cm por encima del mentón real.
+    """
+    mejor, mejor_z = None, None
+    z = eye - 0.030
+    while z > eye - 0.200:
+        band = [v for v in verts if abs(v.z - z) < 0.0035]
+        if band:
+            ancho = max(v.x for v in band) - min(v.x for v in band)
+            if mejor is None or ancho < mejor:
+                mejor, mejor_z = ancho, z
+        z -= 0.003
+    return mejor_z if mejor_z is not None else eye - 0.11
+
+
+EYE_RATIO = 0.415
+
+
+# El mentón NO se adivina por geometría: la malla base ya trae el grupo de
+# vértices anatómico `joint-jaw`, centrado en el eje y a la altura del mentón.
+# Tres heurísticas de perfil dieron tres resultados distintos según dónde
+# arrancara el escaneo; el grupo es exacto y no depende de nada.
+
+
+_crown = max(v.co.z for v in me.vertices)
+_eye = (L_EYE + style_delta(L_EYE)).z
+_chin = medir_menton([v.co for v in me.vertices], _eye)
+_hh = _crown - _chin
+_ratio = (_eye - _chin) / _hh
+_eye_new = _chin + _hh * EYE_RATIO
+_k_low = (_eye_new - _chin) / (_eye - _chin)
+_k_up = (_crown - _eye_new) / (_crown - _eye)
+print(f"[EST] cabeza: menton {_chin:.4f} ojos {_eye:.4f} coronilla {_crown:.4f}")
+print(f"[EST] linea de ojos {_ratio*100:.1f}% -> {EYE_RATIO*100:.0f}% "
+      f"(abajo x{_k_low:.3f}, arriba x{_k_up:.3f})")
+
+
+def remap_z(p):
+    """Remapeo vertical, difuminado a través del cuello para no romperlo."""
+    w = smoothstep(_chin - 0.115, _chin + 0.010, p.z)
+    if w <= 0.0:
+        return p
+    if p.z < _eye:
+        nz = _chin + (p.z - _chin) * _k_low
+    else:
+        nz = _eye_new + (p.z - _eye) * _k_up
+    return Vector((p.x, p.y, lerp(p.z, nz, w)))
+
+
+for v in me.vertices:
+    v.co = remap_z(v.co)
+me.update()
+
 # --- 5b: ojos, del pack CC0 de MakeHuman ---------------------------------------
 # Vienen ajustados a ESTA malla base, así que no hay que adivinar el encaje. Se
 # les aplica la MISMA deformación y normalización que a la cabeza, y así siguen
@@ -281,7 +372,7 @@ if os.path.exists(EYE_OBJ):
         izq = v.x > mid
         base = cL if izq else cR
         tgt = L_EYE if izq else R_EYE
-        ctr = tgt + style_delta(tgt)               # dónde acaba el centro del ojo
+        ctr = remap_z(tgt + style_delta(tgt))      # dónde acaba el centro del ojo
         moved.append(ctr + (v - base) * EYEBALL_SCALE)
     eye_v = moved
 
@@ -296,7 +387,7 @@ me.update()
 # Las referencias de ojo se pasan por la MISMA deformación y la misma
 # normalización que la malla: así el paso 3 sabe exactamente dónde acabaron.
 def to_final(pt):
-    q = pt + style_delta(pt)
+    q = remap_z(pt + style_delta(pt))          # mismo remapeo que la malla
     return Vector((q.x * k, q.y * k, (q.z - zmin) * k))
 
 
@@ -324,6 +415,7 @@ h["ALONSO_R_EYE"] = tuple(RE)
 h["ALONSO_EYE_SEP"] = (LE - RE).length
 EYE_Z = (LE.z + RE.z) * 0.5
 print(f"[EST] ojos finales: L {tuple(round(c,4) for c in LE)} sep {(LE-RE).length:.4f}")
+h["ALONSO_CHIN_Z"] = medir_menton([v.co for v in me.vertices], EYE_Z)
 h["ALONSO_EYE_Z"] = EYE_Z
 h["ALONSO_CROWN_Z"] = max(v.co.z for v in me.vertices)
 h["ALONSO_HEIGHT"] = HEIGHT_TARGET

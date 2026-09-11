@@ -148,6 +148,32 @@ realista; los rasgos de este estilo van sobre una cara plana. Además: cabeza al
 
 ---
 
+## v5 — aplicar lo aprendido
+
+La biblioteca de conocimiento sirvió para medir, y la medición cambió el modelo.
+
+| v4 | v5 |
+|---|---|
+| ![v4](img/alonso-v4-cara.jpg) | ![v5](img/alonso-v5-cara.jpg) |
+
+| Medida | v4 | v5 | Objetivo |
+|---|---|---|---|
+| Cabezas de alto | 7,8-8,2 | **6,59** | 6,5 |
+| Línea de ojos | 55,2 % | **44,7 %** | 40-46 % |
+| Cráneo | 44,8 % | **55,3 %** | 54-60 % |
+| Ancho de ojo | 29 % | **34 %** | 33-35 % |
+
+El hallazgo: **los ojos estaban demasiado ALTOS**, por encima incluso del punto
+realista. Eso dejaba la bóveda craneal pequeña, y es lo que hacía que la cara
+leyera adulta por muchos ojos grandes que se le pusieran.
+
+![Cuerpo v5](img/alonso-v5-cuerpo.jpg)
+
+Detalle completo, incluidos los cuatro intentos fallidos de medir el mentón, en
+[conocimiento/06](../conocimiento/06-diagnostico-alonso.md).
+
+---
+
 ## Lo que sigue sin estar
 
 - **La mirada no lee.** El iris llena toda la apertura del párpado y el ojo queda

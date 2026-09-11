@@ -165,7 +165,7 @@ if _viejo:                       # el globo esférico del pack ya no se usa
 
 L_EYE = Vector(ob["ALONSO_L_EYE"])
 R_EYE = Vector(ob["ALONSO_R_EYE"])
-EW, EH = 0.0212, 0.0150          # semiejes del hueco del párpado
+EW, EH = 0.0277, 0.0177          # 34 % del ancho de cara (conocimiento/06)
 
 
 def eye_mask(x, z, c):
@@ -202,17 +202,22 @@ def build_eye(ctr, side):
     EYES.add(V, F, 0, smooth=True)
 
     # iris grande, anillo limbal, pupila y dos brillos
-    IR = 0.0094
+    # El iris toca el párpado superior y se mete debajo (conocimiento/02).
+    # Flotando con blanco alrededor lee como sorpresa o como muñeco.
+    IR = 0.0122
+    IZ = 0.0026                       # se sube: tapado arriba, esclerótica abajo
     for (s0, s1, mat, tint) in ((1.00, 0.90, 1, (0.16, 0.18, 0.22)),
                                 (0.90, 0.46, 1, (1.00, 1.06, 1.00)),
                                 (0.46, 0.30, 1, (1.85, 2.00, 1.80)),
                                 (0.30, 0.06, 3, (0.10, 0.10, 0.12))):
-        V, F = loft([ell(IR * s0, IR * s0 * 1.06, 0.0050 + 0.0012 * (1 - s0), 30),
-                     ell(IR * s1, IR * s1 * 1.06, 0.0050 + 0.0012 * (1 - s1), 30)],
-                    cap_start=False, cap_end=True)
+        r0 = [(x, y, z + IZ) for (x, y, z) in
+              ell(IR * s0, IR * s0 * 1.04, 0.0050 + 0.0012 * (1 - s0), 30)]
+        r1 = [(x, y, z + IZ) for (x, y, z) in
+              ell(IR * s1, IR * s1 * 1.04, 0.0050 + 0.0012 * (1 - s1), 30)]
+        V, F = loft([r0, r1], cap_start=False, cap_end=True)
         EYES.add(V, F, mat, smooth=True, tint=tint)
-    for (hx, hz, hr, hi) in ((-0.0040, 0.0050, 0.0031, 14.0),
-                             (0.0046, -0.0042, 0.0016, 4.0)):
+    for (hx, hz, hr, hi) in ((-0.0048, 0.0072, 0.0034, 14.0),
+                             (0.0052, -0.0026, 0.0017, 4.0)):
         hv, hf = ico(2)
         EYES.add([(x * hr + ctr.x + hx * side, y * hr * 0.4 + fy - 0.0064,
                    z * hr + ctr.z + hz) for (x, y, z) in hv], hf, 0,
