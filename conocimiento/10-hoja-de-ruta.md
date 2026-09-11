@@ -7,8 +7,10 @@ fracasos de este proyecto han sido saltarse un paso, no ejecutarlo mal.
 
 ## Fase 0 — Decidir antes de tocar geometría
 
-1. **Forma dominante** (ficha 07): círculo, cuadrado o triángulo. Fija la
-   primera impresión.
+0. **Pila de render** (ficha 15). En ÁNIMA está fijada: **NPR puro**. Es una
+   decisión estructural; no se cambia a mitad.
+1. **Matriz de formas** (fichas 07 y 15): forma primaria, secundaria y **una
+   silueta prohibida**. Esa tercera es la que evita la deriva.
 2. **Edad → cabezas de alto** (ficha 04): 4-5 niño, **6-6,5 adolescente**,
    7-8 adulto. Este número condiciona todo lo demás.
 3. **Silueta en papel**: qué mancha quiero. Sin esto no se empieza.
@@ -23,8 +25,9 @@ fracasos de este proyecto han sido saltarse un paso, no ejecutarlo mal.
    cabezas de alto, línea de ojos, cráneo y **ancho/alto de cabeza**.
 7. Tallar los **planos de la cabeza** (ficha 08): plano lateral del temporal al
    pómulo. Sin él, es una esfera con rasgos.
-8. **PRUEBA DE LA SILUETA** (ficha 07). Si no pasa, volver al paso 6.
-   **No continuar.**
+8. **PRUEBA DE LA SILUETA como PUERTA** (fichas 07 y 15): a 5 m, 15 m y 50 m,
+   y en las cinco poses canónicas. Si no pasa, volver al paso 6.
+   **No continuar** — saltarse esta puerta sale más caro después.
 
 ## Fase 2 — Secundarias: rasgos
 

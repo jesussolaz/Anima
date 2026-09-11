@@ -23,6 +23,8 @@ frente al 50 % realista" sí.
 | [11](11-sombreado-toon.md) | **Sombreado toon** | Cel shading, contorno y normales esferizadas |
 | [12](12-ropa.md) | Ropa | Se extrae del cuerpo, no se modela aparte |
 | [13](13-rig-y-expresiones.md) | Rig y expresiones | Shape keys, estándar VRM, huesos secundarios |
+| [14](14-modelar-la-cara.md) | **Modelar la cara** | Orden de operaciones, y por qué la cara anime es puntiaguda |
+| [15](15-direccion-de-arte.md) | **Dirección de arte** | Pila de render, matriz de formas, la silueta como puerta |
 
 ## Fuentes
 
