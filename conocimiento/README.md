@@ -20,6 +20,9 @@ frente al 50 % realista" sí.
 | [08](08-planos-de-la-cabeza.md) | Planos de la cabeza | Por qué una cabeza no es una esfera con rasgos |
 | [09](09-dataset-referencias.md) | **Dataset de referencias** | Medidas reales de personajes cartoon bien hechos |
 | [10](10-hoja-de-ruta.md) | **HOJA DE RUTA** | El procedimiento completo, en orden |
+| [11](11-sombreado-toon.md) | **Sombreado toon** | Cel shading, contorno y normales esferizadas |
+| [12](12-ropa.md) | Ropa | Se extrae del cuerpo, no se modela aparte |
+| [13](13-rig-y-expresiones.md) | Rig y expresiones | Shape keys, estándar VRM, huesos secundarios |
 
 ## Fuentes
 

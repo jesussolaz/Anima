@@ -42,9 +42,27 @@ fracasos de este proyecto han sido saltarse un paso, no ejecutarlo mal.
     menores **solo para puentear huecos**. Demasiados solapados = borrón gris.
 16. Silueta otra vez, ahora con pelo. Es la prueba que más veces falla.
 
-## Fase 4 — Terciarias y producción
+## Fase 4 — Ropa
 
-17. Ropa, materiales PBR, rig, expresiones, LODs.
+17. **Extraer la ropa del cuerpo** (duplicar caras, separar, empujar, Solidify).
+    No modelarla aparte. Ficha 12.
+18. Silueta otra vez, vestido. La ropa cambia la silueta más que la cara.
+
+## Fase 5 — Sombreado
+
+19. **`View Transform = Standard`.** Con AgX el estilo sale lavado. Ficha 11.
+20. **Cel shader**: `Diffuse BSDF → Shader to RGB → Color Ramp (Constant)`.
+    La sombra **desplaza el tono**, no solo oscurece.
+21. **Normales esferizadas en la cara** (Data Transfer desde esfera), o la nariz
+    y las cuencas tiran sombras que delatan el 3D — el *blob face*.
+22. **Contorno** por casco invertido: Solidify negativo + Flip + material negro
+    con Backface Culling.
+23. **Un solo Sun.** Varias luces ensucian el corte entre bandas.
+
+## Fase 6 — Producción
+
+24. Rig con shape keys y estándar VRM de expresiones, huesos secundarios, LODs.
+    Ficha 13.
 
 ---
 
