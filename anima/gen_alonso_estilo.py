@@ -164,7 +164,9 @@ def style_delta(p):
         # en Z se escala menos: escalar uniforme desde el cuello alarga la cabeza
         # y sale un huevo en vez de una cabeza juvenil (ancha, no larga)
         d = p - NECKJ
-        delta_i += Vector((d.x, d.y, d.z * 0.92)) * ((HEAD_SCALE - 1.0) * w)
+        # el estilizado de referencia tiene la cabeza ANCHA: ancho/alto 0,95,
+        # frente al 0,83 que tenía Alonso. Se ensancha en X más que en Z.
+        delta_i += Vector((d.x * 1.58, d.y * 1.05, d.z * 0.92)) * ((HEAD_SCALE - 1.0) * w)
 
     # OJOS. Campo ceñido al ojo, y crece mucho más en vertical que en horizontal:
     # un ojo JRPG no es un ojo realista escalado, es un ojo ABIERTO, que se come
@@ -221,12 +223,14 @@ def style_delta(p):
     if w > 0.002:
         delta_i += Vector((p.x, p.y + 0.015, 0.0)) * (0.016 * w)
 
-    # Torso en V (conocimiento/04). Con la cabeza a proporción de adolescente,
-    # unos hombros estrechos hacen que el conjunto lea como niño: hay que
-    # compensar ensanchando hombros y estrechando cintura.
+    # Hombros. MEDIDO sobre el estilizado CC0 de Blender Studio: 2,72 cabezas de
+    # ancho de hombro, frente a 3,48 del realista del mismo autor. Alonso estaba
+    # en 3,66 — más ancho incluso que un realista. En este estilo la cabeza es
+    # grande y el hombro comparativamente ESTRECHO; ensancharlo (lo que hice
+    # antes) va justo en la dirección contraria.
     if CLAV_L is not None:
         wsh = smoothstep(1.0, 0.0, clamp01(abs(p.z - CLAV_L.z) / 0.105))
-        delta_i.x += p.x * 0.150 * wsh
+        delta_i.x -= p.x * 0.190 * wsh
         wci = smoothstep(1.0, 0.0, clamp01(abs(p.z - (CLAV_L.z - 0.235)) / 0.085))
         delta_i.x -= p.x * 0.045 * wci
 

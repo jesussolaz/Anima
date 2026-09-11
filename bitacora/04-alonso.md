@@ -174,6 +174,50 @@ Detalle completo, incluidos los cuatro intentos fallidos de medir el mentón, en
 
 ---
 
+## v6 — medir referencias en vez de suponer
+
+Cambio de método: en lugar de leer guías y estimar, **medir personajes cartoon
+bien hechos y copiar sus números**. Se usaron las bases humanas CC0 de Blender
+Studio, que traen versión realista y estilizada **del mismo autor**: la
+diferencia entre ambas es exactamente el efecto de estilizar.
+
+| Métrica | Realista | Estilizado | Alonso v5 | **Alonso v6** |
+|---|---|---|---|---|
+| Cabezas de alto | 7,93 | 6,12 | 6,59 | 6,59 |
+| Línea de ojos | 47,9 % | 44,9 % | 44,7 % | 44,7 % |
+| Cráneo | 52,1 % | 55,1 % | 55,3 % | 55,3 % |
+| **Ancho/alto cabeza** | 0,853 | **0,932** | 0,858 | **0,932** |
+
+El hallazgo que **ninguna guía mencionaba**: la cabeza estilizada es mucho más
+**ANCHA**. Alonso llevaba una cabeza de anchura realista y esa era una de las
+razones de que no leyera cartoon.
+
+![v6](img/alonso-v6-cara.jpg)
+
+### Y una trampa de medición
+
+El primer intento midió "ancho de hombros" como anchura máxima del tronco. En
+pose A **eso mide los brazos**, no los hombros, y depende del ángulo de la pose.
+Llevó a estrechar hombros sin motivo. Regla nueva: solo métricas independientes
+de la pose.
+
+### Dos herramientas nuevas
+
+- `herramientas/medir_personaje.py` — audita cualquier humanoide contra el
+  dataset. Sirve igual para los personajes propios que para extraer números de
+  referencias.
+- `herramientas/prueba_silueta.py` — renderiza la mancha en negro. Es la
+  comprobación objetiva de la fase de bloqueo.
+
+Y la silueta ya está diagnosticando lo siguiente:
+
+![silueta](img/alonso-silueta-cabeza.jpg)
+
+El pelo **no pasa la prueba**: lee como un fleco de púas sueltas, no como una
+masa diseñada. Eso es lo próximo.
+
+---
+
 ## Lo que sigue sin estar
 
 - **La mirada no lee.** El iris llena toda la apertura del párpado y el ojo queda

@@ -16,6 +16,10 @@ frente al 50 % realista" sí.
 | [04](04-proporciones-cuerpo.md) | Proporciones de cuerpo | Cabezas de altura, puntos de referencia |
 | [05](05-pelo.md) | Pelo | Silueta primero, mechones después |
 | [06](06-diagnostico-alonso.md) | **Diagnóstico de Alonso** | Qué incumple hoy, con medidas |
+| [07](07-formas-y-silueta.md) | Formas y silueta | El orden primarias→secundarias→terciarias y la prueba de la silueta |
+| [08](08-planos-de-la-cabeza.md) | Planos de la cabeza | Por qué una cabeza no es una esfera con rasgos |
+| [09](09-dataset-referencias.md) | **Dataset de referencias** | Medidas reales de personajes cartoon bien hechos |
+| [10](10-hoja-de-ruta.md) | **HOJA DE RUTA** | El procedimiento completo, en orden |
 
 ## Fuentes
 
