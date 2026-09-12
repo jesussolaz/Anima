@@ -39,8 +39,12 @@ La evolución de cada pieza, con imágenes, está en la **[bitácora](bitacora/)
 Hace falta el motor instalado (versión `anima-3.0` o posterior de Flipendo). Entonces:
 
 ```
-open -a "Flipendo Player" ~/Flipendo/game/anima/EscenaCharco.blend
+open -a "Flipendo Player" --args ~/Flipendo/game/anima/EscenaCharco.blend
 ```
+
+(El `--args` importa: sin él `open` entrega el fichero como documento y el Player,
+que solo lee la línea de órdenes, arranca vacío y se cierra. Doble clic en el `.app`
+sin fichero hace lo mismo. Hay un lanzador «ÁNIMA - Jugar» en el Escritorio.)
 
 WASD anda, **Shift** corre, **J** o clic izquierdo pega (tres golpes encadenados),
 espacio salta, el ratón orbita la cámara. Las Pesadillas persiguen y pegan.

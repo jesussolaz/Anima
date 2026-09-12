@@ -12,7 +12,7 @@ Generadores: `anima/gen_charco.py` → `Charco.blend` (la escena) y
 ## Jugar
 
 ```
-open -a "Flipendo Player" ~/Flipendo/game/anima/EscenaCharco.blend
+open -a "Flipendo Player" --args ~/Flipendo/game/anima/EscenaCharco.blend
 ```
 
 WASD para andar, **Shift** para correr, **J** o clic izquierdo para pegar (tres
