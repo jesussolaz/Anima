@@ -16,7 +16,9 @@ cosas están hechas así.
 | [01](01-terreno-lamancha.md) | Terreno 1 — La Mancha | jugable, pendiente de segundo pase |
 | [02](02-molino.md) | El Molino | acabado |
 | [03](03-molino-interior.md) | Interior — la casa del panadero | acabado |
-| [04](04-alonso.md) | Alonso Quijano | en curso, base cambiada |
+| [04](04-alonso.md) | Alonso Quijano | **vestido, con rig y animaciones**; pelo en ronda 1 de v10 |
+| [05](05-espada.md) | La espada de los bisabuelos | v3, en la mano |
+| [06](06-charco.md) | El charco — primera escena jugable | **se juega**: andar, correr, combo de tres golpes |
 
 ## Convenciones
 

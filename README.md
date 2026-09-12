@@ -30,7 +30,22 @@ La evolución de cada pieza, con imágenes, está en la **[bitácora](bitacora/)
 | Terreno 1 — La Mancha | mapa jugable: pueblo, camino, arroyo, molinos |
 | El Molino | pieza héroe: 661 tejas colocadas una a una, aspas de celosía |
 | Interior del Molino | la casa del panadero: horno de bóveda de 213 ladrillos |
-| Alonso Quijano | **en curso** — [base cambiada dos veces](bitacora/04-alonso.md) |
+| Alonso Quijano | **vestido, con rig y 11 animaciones CC0** — [bitácora](bitacora/04-alonso.md); el pelo sigue en obras |
+| La espada | ropera de lazo de 1520, [en la mano](bitacora/05-espada.md) |
+| El charco | **primera escena jugable**: [andar, correr y pegar](bitacora/06-charco.md) |
+
+## Jugar
+
+Hace falta el motor instalado (versión `anima-3.0` o posterior de Flipendo). Entonces:
+
+```
+open -a "Flipendo Player" ~/Flipendo/game/anima/EscenaCharco.blend
+```
+
+WASD anda, **Shift** corre, **J** o clic izquierdo pega (tres golpes encadenados),
+espacio salta, el ratón orbita la cámara. Las Pesadillas persiguen y pegan.
+
+![Alonso en el charco](bitacora/img/charco-correr.jpg)
 
 ## Conocimiento
 

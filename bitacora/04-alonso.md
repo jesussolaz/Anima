@@ -401,6 +401,75 @@ ANCHO/ALTO CABEZA   0.931  (referencias CC0 ~0,94)
   antes de tocarlo: estimar a ojo es justo lo que no funciona.
 - Sigue desnudo. La ropa es lo de mayor impacto que queda.
 
+## v10 — Pelo por jerarquía de tres tamaños (ronda 1, 2026-09-12)
+
+El carril del pelo de la noche midió **tres referencias CC0** (Quaternius, VRoid,
+OpenGameArt) en vez de estimar, y de ahí salió la regla que faltaba: el pelo anime
+tiene **tres tamaños** — masas grandes que hacen la silueta, mechones medios que las
+componen y hebras finas que viven dentro o se desprenden — y las finas son **copias
+escaladas de las medias**, no piezas diseñadas aparte. Capa de pelo sobre el cráneo
+medida en un VRoid masculino: coronilla 3,3 cm, frente 2,3, laterales 2,8, nuca 3,1.
+El estudio de estructura del pelo de Sora en KH3 (a partir de imágenes públicas, sin
+tocar ningún modelo) se usó para la jerarquía y las direcciones, no para la silueta.
+
+| 3/4 | Espalda |
+|---|---|
+| ![v10](img/alonso-v10-34.jpg) | ![espalda](img/alonso-v10-espalda.jpg) |
+
+Es una **ronda 1**: los tres jueces la puntúan 5,5/10, mejor que v9, con dos fallos
+escritos que siguen ahí: desde atrás se ve el cráneo por **dos huecos de ~55 × 135 mm
+detrás de las orejas** (la vista que más se ve en tercera persona), y en perfil la
+coronilla lee como cúpula lisa (capa mediana 12 mm donde el criterio pide 32-40).
+La ronda 2 no llegó a correr: se acabó el cupo de agentes a las 02:47.
+
+## v11 — Vestido (2026-09-12)
+
+![Alonso vestido](img/alonso-v11-vestido.jpg)
+
+Ocho prendas **extraídas del propio cuerpo** (ficha 12): jubón con faldillas,
+camisa, pañuelo, pretina, greguescos, botas y guantes; 13.848 tris de ropa sobre
+un presupuesto de 15.000. Las zonas se seleccionan con los **pesos del rig
+`game_engine` de MPFB2**, porque los 136 grupos `helper-*`/`joint-*` de MakeHuman
+están vacíos desde que se podaron los helpers.
+
+El diseño sale del propio *Quijote* (II, 18: «valona a lo estudiantil, sin almidón
+y sin randas», «borceguíes datilados») y de la indumentaria castellana de 1590-1620
+para un hidalgo **pobre**: coleto de paño azul de pastel, camisa de lienzo crudo,
+greguescos estrechos de buriel, pretina de cuero con hebilla de latón viejo,
+pañuelo rojo de rubia. Lo que se descartó, y por qué: greguescos abullonados
+(silueta prohibida: achaparrada), lechuguilla (cortesana y tapa el cuello),
+capa (tapa el brazo de la espada), el negro (era el color caro), y cualquier
+reparto rojo-arriba/azul-cinturón/amarillo-zapato — ese es el de Sora.
+
+Números que mandan: bota = 18 % de la altura, pretina = 3 % en la cintura natural,
+seis alternancias claro/oscuro de arriba abajo, y ningún color cerca del verde del
+iris. Hallazgo de paso: `sombra_de()` **invertía las bandas en 6 de 9 colores de
+ropa** (la sombra salía más clara que la luz); `anima_toon.py` lleva la versión
+que conserva la luminancia.
+
+## v12 — Rig, animaciones y la espada en la mano (2026-09-12)
+
+Rig `game_engine` de MPFB2: 53 huesos con nombres de Unreal, pesos de MakeHuman
+(0 vértices sin peso en el cuerpo y en las ocho prendas), pelo y ojos al hueso
+`head`, espada a `hand_r`. El hallazgo que lo hizo posible en una noche: **los
+nombres de hueso coinciden con los de la Universal Animation Library de
+Quaternius** (260 clips, CC0), así que el retarget es por nombre corrigiendo solo
+la diferencia de pose de reposo (orientación de mundo + twist sobre Y; el método
+sin twist torcía manos y pies).
+
+| Tira del primer golpe | En el Player |
+|---|---|
+| ![ataque](img/alonso-v12-tira-ataque1.jpg) | ![player](img/alonso-v12-player-ataque.jpg) |
+
+Once acciones a 30 fps: Idle 75 frames, Andar 40, Correr 28, Ataque1 13, Ataque2 14,
+Ataque3 34, Salto 41, Golpe 11 y tres más. El motor las lee de las propiedades
+`fl_anim_*` del rig (`"Accion:inicio:fin"`) y escala la velocidad de cada ataque a la
+duración del `HitSpec` del combo. Trampa que costó una vuelta: `Alonso.blend` ya no
+tiene los `joint-*` que MPFB usa para colocar el rig, así que se ajusta sobre
+`AlonsoBase.blend` y cada articulación se remapea por sus 32 vértices vecinos.
+
+Dónde se ve todo junto: [06 — El charco](06-charco.md).
+
 ## Siguiente
 
 1. Rehacer el ajuste de ojos y pelo por proyección, no por rayos.
