@@ -1,0 +1,40 @@
+Universal Animation Library 1 y 2 [Standard] — Quaternius
+==========================================================
+
+Ambos packs son CC0 1.0 (dominio público). Descargados gratis el 2026-09-12 para ÁNIMA
+(carril RIG), sin pagar y sin registrarse, por el enlace "No thanks, just take me to the
+downloads" de itch.io. Se guardan enteros porque el retarget se hace desde los .glb.
+
+1) Universal Animation Library [Standard]  (UAL1)
+   Página:   https://quaternius.com/packs/universalanimationlibrary.html
+   Descarga: https://quaternius.itch.io/universal-animation-library
+   Fichero:  Universal Animation Library[Standard].zip  (15.904.933 bytes, itch upload_id 17958403,
+             subido 2026-06-16)  -> guardado como UniversalAnimationLibrary-Standard.zip
+   Contiene 43 clips a 30 fps sobre un esqueleto de 65 huesos con nombres UE (root, pelvis,
+   spine_01..03, neck_01, Head, clavicle/upperarm/lowerarm/hand_l|r, dedos 01..03 + *_04_leaf,
+   thigh/calf/foot/ball_l|r + ball_leaf), pose de reposo en T, 1,68 m hasta la cabeza del hueso Head.
+   La versión "Source" de pago (con .blend y 120+ clips) NO se ha comprado ni se necesita.
+
+2) Universal Animation Library 2 [Standard]  (UAL2)
+   Página:   https://quaternius.itch.io/universal-animation-library-2
+   Fichero:  Universal Animation Library 2[Standard].zip  (18.735.003 bytes, itch upload_id 17958478)
+             -> guardado como UniversalAnimationLibrary2-Standard.zip
+   Mismo esqueleto (65 huesos, T-pose, mismas posiciones de hueso), 43 clips a 30 fps, entre ellos
+   Sword_Regular_A/B/C, Sword_Regular_Combo, Sword_Heavy_Combo, Sword_Block, Sword_Dash,
+   Hit_Knockback, Melee_Hook. Incluye también un maniquí femenino (Female Mannequin/).
+
+Cada carpeta tiene su License.txt y README.txt originales. En los dos:
+
+    License:
+    CC0 1.0 Universal (CC0 1.0)
+    Public Domain Dedication
+    https://creativecommons.org/publicdomain/zero/1.0/
+
+    Models by @Quaternius
+    Consider supporting me on Patreon!
+    https://www.patreon.com/quaternius
+
+Nota del README original: "The Universal Animation Library comes in two files: the one
+ending in _RM has root motion baked into every animation, while the other has root
+motion disabled." Para ÁNIMA se usa el fichero SIN root motion (el CharacterController
+C++ mueve al Player; el clip solo mueve los huesos).

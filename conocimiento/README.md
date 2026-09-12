@@ -25,6 +25,7 @@ frente al 50 % realista" sí.
 | [13](13-rig-y-expresiones.md) | Rig y expresiones | Shape keys, estándar VRM, huesos secundarios |
 | [14](14-modelar-la-cara.md) | **Modelar la cara** | Orden de operaciones, y por qué la cara anime es puntiaguda |
 | [15](15-direccion-de-arte.md) | **Dirección de arte** | Pila de render, matriz de formas, la silueta como puerta |
+| [17](17-animacion-y-retarget.md) | **Animación y retarget** | Clips CC0 de Quaternius, T vs A, swing/twist, impacto y HitSpec, la espada en la mano |
 
 ## Fuentes
 

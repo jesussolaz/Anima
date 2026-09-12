@@ -1,0 +1,4 @@
+# Los zips y los packs descomprimidos se descargan de origen (ver LICENSE.txt);
+# al repo solo van los dos .glb que usa anima_retarget.py y la licencia.
+*.zip
+Universal Animation Library*/
