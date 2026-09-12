@@ -518,7 +518,14 @@ def transport_frames(path, up_hint=(0.0, 0.0, 1.0)):
 
 
 def sweep(path, section, scales=None, twist=None, caps=True, up_hint=(0, 0, 1)):
-    """Barre una sección 2D [(u,v), ...] a lo largo de un camino."""
+    """Barre una sección 2D [(u,v), ...] a lo largo de un camino.
+
+    `scales[i]` puede ser un número (escala uniforme) o una tupla (su, sv):
+    su escala el eje u de la sección (el ANCHO del mechón) y sv el eje v (su
+    GROSOR). Se separan porque un mechón de pelo no se afila igual en los dos
+    ejes: medido en VRoid, en el último quinto conserva el 80 % del ancho y
+    solo el 62 % del grosor (se aplana antes de afilarse). Con una sola escala
+    el mechón leía como triángulo desde la raíz (Alonso v9, taper 3,0)."""
     P, frames = transport_frames(path, up_hint)
     rings = []
     for i, (p, (t, n, b)) in enumerate(zip(P, frames)):
@@ -555,6 +562,16 @@ def clump_section(w=1.0, h=0.42):
     cel-shading convierte en corte limpio entre luz y sombra."""
     return [(-1.00 * w, 0.00), (-0.52 * w, 0.86 * h), (0.0, 1.15 * h),
             (0.52 * w, 0.86 * h), (1.00 * w, 0.00), (0.0, -0.62 * h)]
+
+
+def fino_section(h=0.5):
+    """Sección de hebra fina: ROMBO de 4 vértices, ancho 2 y grosor h.
+    Para mechones finos y pelos sueltos no hace falta la cuña de 6 vértices:
+    la FAQ de VRoid mide que la sección abierta de pocos vértices divide el
+    coste del pelo por 4,2, y CG Cookie lo dice con otras palabras: "para
+    hebras muy finas basta un rectángulo". Con 4 vértices y 6 segmentos un
+    fino cuesta 44 triángulos frente a los 128 de un principal."""
+    return [(-1.0, 0.0), (0.0, 0.5 * h), (1.0, 0.0), (0.0, -0.5 * h)]
 
 
 def hair_lock(path, w0=0.020, w1=0.002, thick=0.55, n=14, twist_amt=0.0,

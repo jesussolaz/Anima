@@ -1,0 +1,8 @@
+Modelos de VRoid Studio (versiones alpha) liberados por VRoid Project (Pixiv) bajo CC0 1.0 Universal.
+Origen de la descarga: https://opengameart.org/content/vroid-studio-cc0-models (subido por "hecko"; la página declara CC0).
+Ficheros: hairsample_male.zip, base_male.zip (formato VRM 0.x = glTF 2.0 binario).
+Uso en ANIMA: SOLO como referencia de medida y estudio de técnica (ver referencias/README.md). No entra en el juego.
+Descargado el 2026-09-12.
+
+Nota: Base_Male.vrm NO trae malla de pelo (solo Face y Body); vale como cabeza de referencia. El peinado esta en HairSample_Male.vrm (melena larga, 315 tiras).
+Script de medida: scratchpad medir_vrm.py (lee el GLB a mano y reconstruye con from_pydata).

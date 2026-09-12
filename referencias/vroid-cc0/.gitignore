@@ -1,0 +1,4 @@
+# Los .vrm y los zips de VRoid (CC0) pesan 64 MB y solo sirven para MEDIR (herramientas/medir_pelo_vrm.py).
+# Se descargan de origen: ver LICENSE.txt. Al repo van la licencia y las medidas.
+*.zip
+*.vrm

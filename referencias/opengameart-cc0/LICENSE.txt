@@ -1,0 +1,3 @@
+side_parting_hair.blend - "Side parting hairstyle for male model", autor Micket, CC0 1.0 Universal.
+Origen: https://opengameart.org/content/side-parting-hairstyle-for-male-model (201 triangulos, pensado para un humano base de <1000 poligonos).
+Uso en ANIMA: SOLO referencia de medida. No entra en el juego. Descargado el 2026-09-12.
