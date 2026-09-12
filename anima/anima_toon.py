@@ -29,18 +29,36 @@ GROSOR_CONTORNO_ROPA = {
 }
 
 
-def sombra_de(color, calida=False, fuerza=0.62):
+def sombra_de(color, calida=False, fuerza=0.62, k=0.30):
     """El color de sombra DESPLAZA EL TONO, no solo oscurece (conocimiento/11).
     Piel hacia el rojo; el resto hacia el azul/púrpura.
 
     NO se hace sumando al matiz: sumarle a un marrón (matiz ~0,05) lo lleva al
     amarillo-verde, no al azul. Se MEZCLA hacia un tinte objetivo en RGB, que
     funciona sea cual sea el color de partida.
+
+    VERSIÓN 2 (carril ROPA, informe anima-ropa-diseno.md §4.4). La v1 de
+    gen_alonso.py hacía `c*fuerza*(1-k) + t*k*fuerza` por canal: el término
+    del tinte SUMA (0,058, 0,063, 0,117) en lineal a cualquier color, y en los
+    colores oscuros de la ropa (canales < 0,1) la sombra salía MÁS CLARA que la
+    luz: el cel al revés en 6 de 9 materiales (cuero: luz L* 15,6, media 33,2,
+    sombra 28,7). Aquí el tinte se reescala a la luminancia de color*fuerza,
+    así Y(sombra) = fuerza * Y(luz) SIEMPRE y el tinte solo mueve el matiz.
+    En piel y pelo (claros) cambia poco: piel sombra (226,188,173) frente a
+    (201,175,162) sRGB; pelo (105,83,81) frente a (110,89,93). Comprobado con
+    informes/ropa-diseno/paleta.py (11 materiales ordenados luz>media>sombra).
+    gen_alonso.py sigue con la v1 hasta que INTEGRACIÓN lo haga importar de aquí.
     """
     tinte = (0.62, 0.26, 0.20) if calida else (0.24, 0.26, 0.48)
-    k = 0.30
-    return tuple(max(0.0, min(1.0, c * fuerza * (1 - k) + t * k * fuerza))
-                 for c, t in zip(color, tinte))
+    base = tuple(c * fuerza for c in color)
+
+    def Y(c):
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    yb, yt = Y(base), Y(tinte)
+    t2 = tuple(t * yb / yt for t in tinte) if yt > 0 else base
+    return tuple(max(0.0, min(1.0, (1 - k) * b + t))
+                 for b, t in zip(base, tuple(k * x for x in t2)))
 
 
 def toon(name, color, calida=False, bandas=2, fuerza=0.62, spec=0.0,
@@ -216,6 +234,14 @@ def contorno(obj, grosor=0.0013, nombre="Contorno", material=None):
     m.offset = 1.0
     m.use_flip_normals = True
     m.use_rim = False
-    m.material_offset = idx
-    m.material_offset_rim = idx
+    # material_offset es RELATIVO al índice de material de cada cara y Blender
+    # lo recorta al último slot: con el índice absoluto del contorno, una cara
+    # con material 1 (la suela de la bota, la hebilla) mandaba su casco al slot
+    # idx+1 = otro material, no al negro. Con un desplazamiento enorme todas las
+    # caras caen en el último slot, que es M_Contorno porque se acaba de añadir.
+    # Por eso este módulo exige que el contorno sea el ÚLTIMO material: si se
+    # añaden materiales después, el casco se pinta con ellos.
+    assert idx == len(obj.data.materials) - 1, "M_Contorno debe ser el último slot"
+    m.material_offset = 32767
+    m.material_offset_rim = 32767
     return m
